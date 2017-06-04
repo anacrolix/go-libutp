@@ -2,27 +2,23 @@ package utp
 
 /*
 #cgo CPPFLAGS: -DPOSIX
-#include <errno.h>
-#include <stdio.h>
 #include "utp.h"
+
 uint64_t logCallback(utp_callback_arguments *);
 uint64_t acceptCallback(utp_callback_arguments *);
 uint64_t sendtoCallback(utp_callback_arguments *);
-
-static ssize_t sendto_fd_c(int fd, utp_callback_arguments *a) {
-    printf("sa_len %d, address_len %d, fd %d, sa_family %d\n", a->address->sa_len, a->address_len, fd, a->address->sa_family);
-    ssize_t ret = sendto(fd, a->buf, a->len, 0, a->address, a->address_len);
-    fprintf(stderr, "errno %d\n", errno);
-    return ret;
-}
+uint64_t stateChangeCallback(utp_callback_arguments *);
+uint64_t readCallback(utp_callback_arguments *);
 */
 import "C"
 import (
+	"io"
 	"log"
 	"net"
 	"reflect"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -30,6 +26,8 @@ func (ctx *C.utp_context) setCallbacks() {
 	C.utp_set_callback(ctx, C.UTP_LOG, (*C.utp_callback_t)(C.logCallback))
 	C.utp_set_callback(ctx, C.UTP_ON_ACCEPT, (*C.utp_callback_t)(C.acceptCallback))
 	C.utp_set_callback(ctx, C.UTP_SENDTO, (*C.utp_callback_t)(C.sendtoCallback))
+	C.utp_set_callback(ctx, C.UTP_ON_STATE_CHANGE, (*C.utp_callback_t)(C.stateChangeCallback))
+	C.utp_set_callback(ctx, C.UTP_ON_READ, (*C.utp_callback_t)(C.readCallback))
 }
 
 func (ctx *C.utp_context) setOption(opt, val int) int {
@@ -41,7 +39,7 @@ func sendtoCallback(a *C.utp_callback_arguments) C.uint64 {
 	log.Printf("sendto callback: %v", *a)
 	s := getSocketForUtpContext(a.context)
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
-	b := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{uintptr(unsafe.Pointer(a.buf)), int(a.len), int(a.len)}))
+	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
 	log.Println(addr, b)
 	log.Println(s.pc.WriteToUDP(b, addr))
@@ -58,15 +56,59 @@ func logCallback(a *C.utp_callback_arguments) C.uint64 {
 	return 0
 }
 
+func (a *C.utp_callback_arguments) bufBytes() []byte {
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{uintptr(unsafe.Pointer(a.buf)), int(a.len), int(a.len)}))
+}
+
+//export readCallback
+func readCallback(a *C.utp_callback_arguments) C.uint64 {
+	log.Printf("read callback: %v", *a)
+	c := connForLibSocket(a.socket)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.readBuf = append(c.readBuf, a.bufBytes()...)
+	c.cond.Broadcast()
+	return 0
+}
+
 //export acceptCallback
 func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 	log.Printf("accept callback: %v", *a)
-	s := a.socket
-	var sa syscall.RawSockaddrInet6
-	sal := C.socklen_t(unsafe.Sizeof(sa))
-	C.utp_getpeername(s, (*C.struct_sockaddr)(unsafe.Pointer(&sa)), &sal)
-	log.Printf("%#v", sa)
+	s := getSocketForUtpContext(a.context)
+	s.pushBacklog(newConn(a.socket))
 	return 0
+}
+
+func (a *C.utp_callback_arguments) state() C.int {
+	return *(*C.int)(unsafe.Pointer(&a.anon0))
+}
+
+func libStateName(state C.int) string {
+	return C.GoString((*[5]*C.char)(unsafe.Pointer(&C.utp_state_names))[state])
+}
+
+//export stateChangeCallback
+func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
+	log.Printf("state: %d", a.state())
+	log.Println(len(C.utp_state_names))
+	log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
+	switch a.state() {
+	case C.UTP_STATE_CONNECT:
+	case C.UTP_STATE_WRITABLE:
+	case C.UTP_STATE_EOF:
+		connForLibSocket(a.socket).setGotEOF()
+	case C.UTP_STATE_DESTROYING:
+	default:
+		panic(a.state)
+	}
+	return 0
+}
+
+func newConn(s *C.utp_socket) *Conn {
+	c := &Conn{s: s}
+	c.cond.L = &c.mu
+	libSocketToConn[s] = c
+	return c
 }
 
 func toSockaddr(addr net.Addr) (*C.struct_sockaddr, C.socklen_t) {
@@ -88,9 +130,6 @@ func NewSocket() *Socket {
 	if err != nil {
 		panic(err)
 	}
-	f, _ := pc.File()
-	log.Println("fd", f.Fd())
-	log.Printf("listening at %s", pc.LocalAddr())
 	ctx := C.utp_init(2)
 	ctx.setCallbacks()
 	ctx.setOption(C.UTP_LOG_NORMAL, 1)
@@ -107,9 +146,11 @@ func NewSocket() *Socket {
 			log.Printf("%#v", addr)
 			sa, sal := toSockaddr(addr)
 			C.utp_process_udp(ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal)
+			C.utp_issue_deferred_acks(ctx)
+			C.utp_check_timeouts(ctx)
 		}
 	}()
-	s := &Socket{pc, ctx}
+	s := &Socket{pc, ctx, make(chan *Conn, 5)}
 	mu.Lock()
 	utpContextToSocket[ctx] = s
 	mu.Unlock()
@@ -117,18 +158,28 @@ func NewSocket() *Socket {
 }
 
 type Socket struct {
-	pc  *net.UDPConn
-	ctx *C.utp_context
+	pc      *net.UDPConn
+	ctx     *C.utp_context
+	backlog chan *Conn
 }
 
 var (
 	mu                 sync.Mutex
 	utpContextToSocket = map[*C.utp_context]*Socket{}
+	libSocketToConn    = map[*C.utp_socket]*Conn{}
 )
 
 func (s *Socket) Accept() (net.Conn, error) {
-	select {}
-	return nil, nil
+	c := <-s.backlog
+	return c, nil
+}
+
+func (s *Socket) pushBacklog(c *Conn) {
+	select {
+	case s.backlog <- c:
+	default:
+		c.Close()
+	}
 }
 
 func structSockaddrToUDPAddr(sa *C.struct_sockaddr) *net.UDPAddr {
@@ -185,6 +236,7 @@ func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error) {
 		sa := new(syscall.SockaddrInet4)
 		// p := (*[2]byte)(unsafe.Pointer(&pp.Port))
 		// sa.Port = int(p[0])<<8 + int(p[1])
+		// I don't know why the port isn't reversed when it comes from utp.
 		sa.Port = int(pp.Port)
 		for i := 0; i < len(sa.Addr); i++ {
 			sa.Addr[i] = pp.Addr[i]
@@ -196,6 +248,7 @@ func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error) {
 		sa := new(syscall.SockaddrInet6)
 		// p := (*[2]byte)(unsafe.Pointer(&pp.Port))
 		// sa.Port = int(p[0])<<8 + int(p[1])
+		// I don't know why the port isn't reversed when it comes from utp.
 		sa.Port = int(pp.Port)
 		sa.ZoneId = pp.Scope_id
 		for i := 0; i < len(sa.Addr); i++ {
@@ -214,4 +267,70 @@ func sockaddrToUDP(sa syscall.Sockaddr) net.Addr {
 		return &net.UDPAddr{IP: sa.Addr[0:], Port: sa.Port /*Zone: zoneToString(int(sa.ZoneId))*/}
 	}
 	return nil
+}
+
+type Conn struct {
+	s       *C.utp_socket
+	mu      sync.Mutex
+	cond    sync.Cond
+	readBuf []byte
+	gotEOF  bool
+}
+
+func (c *Conn) Close() error {
+	C.utp_close(c.s)
+	return nil
+}
+
+func (c *Conn) LocalAddr() net.Addr {
+	return getSocketForUtpContext(C.utp_get_context(c.s)).pc.LocalAddr()
+}
+
+func (c *Conn) Read(b []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for {
+		n := copy(b, c.readBuf)
+		c.readBuf = c.readBuf[n:]
+		if len(c.readBuf) == 0 {
+			C.utp_read_drained(c.s)
+		}
+		if len(c.readBuf) == 0 && c.gotEOF {
+			return n, io.EOF
+		}
+		if n != 0 || len(b) == 0 {
+			return n, nil
+		}
+		c.cond.Wait()
+	}
+}
+
+func (c *Conn) Write(b []byte) (int, error) {
+	return 0, nil
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	var rsa syscall.RawSockaddrAny
+	var addrlen C.socklen_t = syscall.SizeofSockaddrAny
+	C.utp_getpeername(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
+	sa, err := anyToSockaddr(&rsa)
+	if err != nil {
+		panic(err)
+	}
+	return sockaddrToUDP(sa)
+}
+
+func (c *Conn) SetDeadline(time.Time) error      { return nil }
+func (c *Conn) SetReadDeadline(time.Time) error  { return nil }
+func (c *Conn) SetWriteDeadline(time.Time) error { return nil }
+
+func connForLibSocket(us *C.utp_socket) *Conn {
+	return libSocketToConn[us]
+}
+
+func (c *Conn) setGotEOF() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gotEOF = true
+	c.cond.Broadcast()
 }
