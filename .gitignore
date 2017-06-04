@@ -3,3 +3,4 @@
 *.so
 tags
 *~
+_obj
