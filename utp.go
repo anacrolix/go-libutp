@@ -94,6 +94,7 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 	log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
+		connForLibSocket(a.socket).setConnected()
 	case C.UTP_STATE_WRITABLE:
 	case C.UTP_STATE_EOF:
 		connForLibSocket(a.socket).setGotEOF()
@@ -125,8 +126,8 @@ func getSocketForUtpContext(ctx *C.utp_context) *Socket {
 	return utpContextToSocket[ctx]
 }
 
-func NewSocket() *Socket {
-	pc, err := net.ListenUDP("udp", &net.UDPAddr{Port: 3000})
+func NewSocket(port int) *Socket {
+	pc, err := net.ListenUDP("udp", &net.UDPAddr{Port: port})
 	if err != nil {
 		panic(err)
 	}
@@ -171,6 +172,23 @@ var (
 
 func (s *Socket) Accept() (net.Conn, error) {
 	c := <-s.backlog
+	return c, nil
+}
+
+func (s *Socket) Dial(addr string) (net.Conn, error) {
+	c := newConn(C.utp_create_socket(s.ctx))
+	rsa := syscall.RawSockaddrInet6{
+		Port: 3000,
+	}
+	if n := copy(rsa.Addr[:], net.IPv4(127, 0, 0, 1).To16()); n != 16 {
+		panic(n)
+	}
+	C.utp_connect(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), syscall.SizeofSockaddrInet6)
+	err := c.waitForConnect()
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -270,11 +288,29 @@ func sockaddrToUDP(sa syscall.Sockaddr) net.Addr {
 }
 
 type Conn struct {
-	s       *C.utp_socket
-	mu      sync.Mutex
-	cond    sync.Cond
-	readBuf []byte
-	gotEOF  bool
+	s          *C.utp_socket
+	mu         sync.Mutex
+	cond       sync.Cond
+	readBuf    []byte
+	gotEOF     bool
+	gotConnect bool
+	writeBuf   []byte
+}
+
+func (c *Conn) setConnected() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gotConnect = true
+	c.cond.Broadcast()
+}
+
+func (c *Conn) waitForConnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for !c.gotConnect {
+		c.cond.Wait()
+	}
+	return nil
 }
 
 func (c *Conn) Close() error {
@@ -306,7 +342,21 @@ func (c *Conn) Read(b []byte) (int, error) {
 }
 
 func (c *Conn) Write(b []byte) (int, error) {
-	return 0, nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := 0
+	for len(b) != 0 {
+		n1 := C.utp_write(c.s, unsafe.Pointer(&b[0]), C.size_t(len(b)))
+		if n1 < 0 {
+			panic(n1)
+		}
+		b = b[n1:]
+		n += int(n1)
+		if n1 == 0 {
+			c.cond.Wait()
+		}
+	}
+	return n, nil
 }
 
 func (c *Conn) RemoteAddr() net.Addr {
