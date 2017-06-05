@@ -30,19 +30,32 @@ func getConn(listen bool, addr string, s *utp.Socket) net.Conn {
 func main() {
 	log.SetFlags(log.Lshortfile | log.Flags())
 	var flags = struct {
-		Listen bool
+		Listen bool `name:"l"`
 		tagflag.StartPos
-		// Addr string
+		Addr string
 	}{}
 	tagflag.Parse(&flags)
-	s := utp.NewSocket(func() int {
+	s, err := func() (*utp.Socket, error) {
 		if flags.Listen {
-			return 3000
+			return utp.NewSocket("udp", flags.Addr)
 		} else {
-			return 0
+			return utp.NewSocket("udp", ":0")
 		}
-	}())
-	c := getConn(flags.Listen, "localhost:3000", s)
+	}()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+	c, err := func() (net.Conn, error) {
+		if flags.Listen {
+			return s.Accept()
+		} else {
+			return s.Dial(flags.Addr)
+		}
+	}()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer c.Close()
 	var wg sync.WaitGroup
 	wg.Add(2)

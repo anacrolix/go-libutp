@@ -22,6 +22,8 @@ import (
 	"unsafe"
 )
 
+type socklen C.socklen_t
+
 func (ctx *C.utp_context) setCallbacks() {
 	C.utp_set_callback(ctx, C.UTP_LOG, (*C.utp_callback_t)(C.logCallback))
 	C.utp_set_callback(ctx, C.UTP_ON_ACCEPT, (*C.utp_callback_t)(C.acceptCallback))
@@ -35,24 +37,27 @@ func (ctx *C.utp_context) setOption(opt, val int) int {
 }
 
 //export sendtoCallback
-func sendtoCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("sendto callback: %v", *a)
+func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	s := getSocketForUtpContext(a.context)
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
-	log.Println(addr, b)
-	log.Println(s.pc.WriteToUDP(b, addr))
-	// salen := *(*C.socklen_t)(unsafe.Pointer(&a.anon1))
-	// log.Println(fd, a.buf, a.len, sa, salen, sa.sa_family)
-	// d, errno := C.sendto(fd, unsafe.Pointer(a.buf), a.len, 0, sa, 16)
-	// log.Println(d, errno)
-	return 0
+	log.Printf("sending %d bytes to %s", len(b), addr)
+	log.Println(s.Addr().Network())
+	n, err := s.pc.WriteTo(b, addr)
+	if err != nil {
+		log.Printf("error sending packet: %s", err)
+		return
+	}
+	if n != len(b) {
+		log.Printf("expected to send %d bytes but only sent %d", len(b), n)
+	}
+	return
 }
 
 //export logCallback
 func logCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("log callback: %v", *a)
+	log.Printf("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
 	return 0
 }
 
@@ -126,42 +131,73 @@ func getSocketForUtpContext(ctx *C.utp_context) *Socket {
 	return utpContextToSocket[ctx]
 }
 
-func NewSocket(port int) *Socket {
-	pc, err := net.ListenUDP("udp", &net.UDPAddr{Port: port})
+func (s *Socket) packetReader() {
+	var b [0x1000]byte
+	for {
+		n, addr, err := s.pc.ReadFrom(b[:])
+		if err != nil {
+			s.mu.Lock()
+			closed := s.closed
+			s.mu.Unlock()
+			if closed {
+				return
+			}
+			panic(err)
+		}
+		log.Println(n, addr, err)
+		log.Printf("%#v", addr)
+		sa, sal := toSockaddr(addr)
+		C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal)
+		C.utp_issue_deferred_acks(s.ctx)
+		C.utp_check_timeouts(s.ctx)
+	}
+}
+
+func NewSocket(network, addr string) (*Socket, error) {
+	pc, err := net.ListenPacket(network, addr)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	ctx := C.utp_init(2)
 	ctx.setCallbacks()
 	ctx.setOption(C.UTP_LOG_NORMAL, 1)
 	ctx.setOption(C.UTP_LOG_MTU, 1)
 	ctx.setOption(C.UTP_LOG_DEBUG, 1)
-	go func() {
-		for {
-			var b [0x1000]byte
-			n, addr, err := pc.ReadFrom(b[:])
-			if err != nil {
-				panic(err)
-			}
-			log.Println(n, addr, err)
-			log.Printf("%#v", addr)
-			sa, sal := toSockaddr(addr)
-			C.utp_process_udp(ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal)
-			C.utp_issue_deferred_acks(ctx)
-			C.utp_check_timeouts(ctx)
-		}
-	}()
-	s := &Socket{pc, ctx, make(chan *Conn, 5)}
+	s := &Socket{
+		pc:      pc,
+		ctx:     ctx,
+		backlog: make(chan *Conn, 5),
+	}
 	mu.Lock()
 	utpContextToSocket[ctx] = s
 	mu.Unlock()
-	return s
+	go s.packetReader()
+	return s, nil
 }
 
 type Socket struct {
-	pc      *net.UDPConn
+	mu      sync.Mutex
+	pc      net.PacketConn
 	ctx     *C.utp_context
 	backlog chan *Conn
+	closed  bool
+}
+
+func (me *Socket) Close() error {
+	me.mu.Lock()
+	defer me.mu.Unlock()
+	if me.closed {
+		return nil
+	}
+	C.utp_destroy(me.ctx)
+	me.pc.Close()
+	close(me.backlog)
+	me.closed = true
+	return nil
+}
+
+func (me *Socket) Addr() net.Addr {
+	return me.pc.LocalAddr()
 }
 
 var (
@@ -177,14 +213,12 @@ func (s *Socket) Accept() (net.Conn, error) {
 
 func (s *Socket) Dial(addr string) (net.Conn, error) {
 	c := newConn(C.utp_create_socket(s.ctx))
-	rsa := syscall.RawSockaddrInet6{
-		Port: 3000,
+	sa, sal, err := herp(s.Addr().Network(), addr)
+	if err != nil {
+		panic(err)
 	}
-	if n := copy(rsa.Addr[:], net.IPv4(127, 0, 0, 1).To16()); n != 16 {
-		panic(n)
-	}
-	C.utp_connect(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), syscall.SizeofSockaddrInet6)
-	err := c.waitForConnect()
+	C.utp_connect(c.s, (*C.struct_sockaddr)(sa), sal)
+	err = c.waitForConnect()
 	if err != nil {
 		c.Close()
 		return nil, err
