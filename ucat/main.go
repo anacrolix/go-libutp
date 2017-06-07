@@ -66,6 +66,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		log.Println(io.Copy(c, os.Stdin))
+		c.Close()
 	}()
 	wg.Wait()
 }
