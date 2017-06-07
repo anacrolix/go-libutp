@@ -227,6 +227,7 @@ func (c *Conn) Close() error {
 	}
 	log.Print("closing conn")
 	C.utp_close(c.s)
+	c.s = nil
 	c.closed = true
 	c.cond.Broadcast()
 	return nil
