@@ -36,5 +36,5 @@ func libStateName(state C.int) string {
 }
 
 func libErrorCodeNames(error_code C.int) string {
-	return C.GoString((*[3]*C.char)(unsafe.Pointer(&C.utp_state_names))[error_code])
+	return C.GoString((*[3]*C.char)(unsafe.Pointer(&C.utp_error_code_names))[error_code])
 }
