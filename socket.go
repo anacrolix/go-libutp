@@ -91,7 +91,9 @@ func (s *Socket) packetReader() {
 			if s.closed {
 				return
 			}
-			if C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal) == 0 {
+			if C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal) != 0 {
+				socketUtpPacketsReceived.Add(1)
+			} else {
 				s.onReadNonUtp(b[:n], addr)
 			}
 			C.utp_issue_deferred_acks(s.ctx)
@@ -186,10 +188,12 @@ func (s *Socket) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
 }
 
 func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
+	socketNonUtpPacketsReceived.Add(1)
 	select {
 	case s.nonUtpReads <- packet{b, from}:
 	default:
 		log.Printf("dropped non utp packet: no room in buffer")
+		nonUtpPacketsDropped.Add(1)
 	}
 }
 
