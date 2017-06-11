@@ -53,7 +53,7 @@ func logCallback(a *C.utp_callback_arguments) C.uint64 {
 
 //export stateChangeCallback
 func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
+	// log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
 	s := libContextToSocket[a.context]
 	c := s.conns[a.socket]
 	switch a.state() {
@@ -83,7 +83,7 @@ func readCallback(a *C.utp_callback_arguments) C.uint64 {
 
 //export acceptCallback
 func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("accept callback: %#v", *a)
+	// log.Printf("accept callback: %#v", *a)
 	s := getSocketForLibContext(a.context)
 	s.pushBacklog(s.newConn(a.socket))
 	return 0
