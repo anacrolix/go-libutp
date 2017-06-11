@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync"
 
+	_ "github.com/anacrolix/envpprof"
+
 	"github.com/anacrolix/go-libutp"
 	"github.com/anacrolix/tagflag"
 )
@@ -61,6 +63,7 @@ func main() {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
+		defer c.Close()
 		log.Println(io.Copy(os.Stdout, c))
 	}()
 	go func() {

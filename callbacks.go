@@ -24,13 +24,10 @@ func (a *C.utp_callback_arguments) error_code() C.int {
 
 //export sendtoCallback
 func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
-	// log.Printf("sendto callback: socket=%p", a.socket)
-	s := getSocketForUtpContext(a.context)
+	s := getSocketForLibContext(a.context)
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
-	log.Printf("sending %d bytes to %s", len(b), addr)
-	// log.Println(s.Addr().Network())
 	n, err := s.pc.WriteTo(b, addr)
 	if err != nil {
 		log.Printf("error sending packet: %s", err)
@@ -57,19 +54,18 @@ func logCallback(a *C.utp_callback_arguments) C.uint64 {
 //export stateChangeCallback
 func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 	log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
-	// Socket is always set for this callback.
-	c := connForLibSocket(a.socket)
+	s := libContextToSocket[a.context]
+	c := s.conns[a.socket]
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
 		c.setConnected()
 	case C.UTP_STATE_WRITABLE:
-		c.mu.Lock()
 		c.cond.Broadcast()
-		c.mu.Unlock()
 	case C.UTP_STATE_EOF:
 		c.setGotEOF()
 	case C.UTP_STATE_DESTROYING:
-		c.onStateDestroying()
+		c.onDestroyed()
+		s.onLibSocketDestroyed(a.socket)
 	default:
 		panic(a.state)
 	}
@@ -78,10 +74,8 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 
 //export readCallback
 func readCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("read callback: %v", *a)
-	c := connForLibSocket(a.socket)
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	s := libContextToSocket[a.context]
+	c := s.conns[a.socket]
 	c.readBuf = append(c.readBuf, a.bufBytes()...)
 	c.cond.Broadcast()
 	return 0
@@ -90,7 +84,7 @@ func readCallback(a *C.utp_callback_arguments) C.uint64 {
 //export acceptCallback
 func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 	log.Printf("accept callback: %#v", *a)
-	s := getSocketForUtpContext(a.context)
-	s.pushBacklog(newConn(a.socket))
+	s := getSocketForLibContext(a.context)
+	s.pushBacklog(s.newConn(a.socket))
 	return 0
 }
