@@ -172,7 +172,7 @@ func (s *Socket) pushBacklog(c *Conn) {
 	select {
 	case s.backlog <- c:
 	default:
-		c.Close()
+		c.close()
 	}
 }
 
