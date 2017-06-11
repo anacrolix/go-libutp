@@ -153,6 +153,10 @@ enum {
 	ST_NUM_STATES,		// used for bounds checking
 };
 
+static const cstr flagnames[] = {
+	"ST_DATA","ST_FIN","ST_STATE","ST_RESET","ST_SYN"
+};
+
 enum CONN_STATE {
 	CS_UNINITIALIZED = 0,
 	CS_IDLE,
@@ -165,6 +169,10 @@ enum CONN_STATE {
 	CS_FIN_SENT,
 	CS_RESET,
 	CS_DESTROY
+};
+
+static const cstr statenames[] = {
+	"UNINITIALIZED", "IDLE","SYN_SENT", "SYN_RECV", "CONNECTED","CONNECTED_FULL","GOT_FIN","DESTROY_DELAY","FIN_SENT","RESET","DESTROY"
 };
 
 struct OutgoingPacket {
