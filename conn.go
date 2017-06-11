@@ -7,7 +7,6 @@ import "C"
 import (
 	"errors"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"syscall"
@@ -68,30 +67,36 @@ func (c *Conn) LocalAddr() net.Addr {
 	return getSocketForLibContext(C.utp_get_context(c.s)).pc.LocalAddr()
 }
 
+func (c *Conn) readNoWait(b []byte) (n int, err error) {
+	n = copy(b, c.readBuf)
+	c.readBuf = c.readBuf[n:]
+	if n != 0 && len(c.readBuf) == 0 {
+		C.utp_read_drained(c.s)
+	}
+	err = func() error {
+		switch {
+		case c.gotEOF:
+			return io.EOF
+		case c.destroyed:
+			return errors.New("destroyed")
+		case c.closed:
+			return errors.New("closed")
+		case !c.readDeadline.IsZero() && !time.Now().Before(c.readDeadline):
+			return errDeadlineExceeded{}
+		default:
+			return nil
+		}
+	}()
+	return
+}
+
 func (c *Conn) Read(b []byte) (int, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	for {
-		n := copy(b, c.readBuf)
-		c.readBuf = c.readBuf[n:]
-		log.Println(n, len(c.readBuf))
-		if n != 0 && len(c.readBuf) == 0 {
-			C.utp_read_drained(c.s)
-		}
-		if len(c.readBuf) == 0 && c.gotEOF {
-			return n, io.EOF
-		}
-		if n != 0 || len(b) == 0 {
-			return n, nil
-		}
-		if c.destroyed {
-			return 0, errors.New("destroyed")
-		}
-		if c.closed {
-			return 0, errors.New("closed")
-		}
-		if !c.readDeadline.IsZero() && !time.Now().Before(c.readDeadline) {
-			return 0, errDeadlineExceeded{}
+		n, err := c.readNoWait(b)
+		if n != 0 || len(b) == 0 || err != nil {
+			return n, err
 		}
 		c.cond.Wait()
 	}
