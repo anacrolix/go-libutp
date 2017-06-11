@@ -6,6 +6,7 @@ package utp
 import "C"
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -33,7 +34,7 @@ type Conn struct {
 
 func (c *Conn) onLibError(codeName string) {
 	if c.libError != nil {
-		panic("multiple lib errors")
+		panic(fmt.Sprintf("multiple lib errors: got %s, have %s", codeName, c.libError))
 	}
 	c.libError = errors.New(codeName)
 	c.cond.Broadcast()
