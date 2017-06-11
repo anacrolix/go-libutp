@@ -123,6 +123,7 @@ func (me *Socket) Close() error {
 	me.ctx = nil
 	me.pc.Close()
 	close(me.backlog)
+	close(me.nonUtpReads)
 	me.closed = true
 	return nil
 }
@@ -174,7 +175,11 @@ func (s *Socket) pushBacklog(c *Conn) {
 }
 
 func (s *Socket) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
-	p := <-s.nonUtpReads
+	p, ok := <-s.nonUtpReads
+	if !ok {
+		err = errors.New("closed")
+		return
+	}
 	n = copy(b, p.b)
 	addr = p.from
 	return
