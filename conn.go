@@ -24,10 +24,19 @@ type Conn struct {
 	// socket after getting this.
 	destroyed bool
 	// Conn.Close was called.
-	closed bool
+	closed   bool
+	libError error
 
 	writeDeadline time.Time
 	readDeadline  time.Time
+}
+
+func (c *Conn) onLibError(codeName string) {
+	if c.libError != nil {
+		panic("multiple lib errors")
+	}
+	c.libError = errors.New(codeName)
+	c.cond.Broadcast()
 }
 
 func (c *Conn) setConnected() {
@@ -36,10 +45,15 @@ func (c *Conn) setConnected() {
 }
 
 func (c *Conn) waitForConnect() error {
-	for !c.gotConnect {
+	for {
+		if c.libError != nil {
+			return c.libError
+		}
+		if c.gotConnect {
+			return nil
+		}
 		c.cond.Wait()
 	}
-	return nil
 }
 
 func (c *Conn) Close() (err error) {
@@ -71,12 +85,15 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 	n = copy(b, c.readBuf)
 	c.readBuf = c.readBuf[n:]
 	if n != 0 && len(c.readBuf) == 0 {
+		// Can we call this if the utp_socket is closed, destroyed or errored?
 		C.utp_read_drained(c.s)
 	}
 	err = func() error {
 		switch {
 		case c.gotEOF:
 			return io.EOF
+		case c.libError != nil:
+			return c.libError
 		case c.destroyed:
 			return errors.New("destroyed")
 		case c.closed:
@@ -102,31 +119,50 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 }
 
-func (c *Conn) Write(b []byte) (int, error) {
+func (c *Conn) writeNoWait(b []byte) (n int, err error) {
+	err = func() error {
+		switch {
+		case c.libError != nil:
+			return c.libError
+		case c.closed:
+			return errors.New("closed")
+		case c.destroyed:
+			return errors.New("destroyed")
+		default:
+			return nil
+		}
+	}()
+	if err != nil {
+		return
+	}
+	n = int(C.utp_write(c.s, unsafe.Pointer(&b[0]), C.size_t(len(b))))
+	if n < 0 {
+		panic(n)
+	}
+	return
+}
+
+func (c *Conn) Write(b []byte) (n int, err error) {
 	mu.Lock()
 	defer mu.Unlock()
-	n := 0
 	for len(b) != 0 {
-		if c.closed {
-			return n, errors.New("closed")
-		}
-		if c.destroyed {
-			return n, errors.New("destroyed")
-		}
-		n1 := C.utp_write(c.s, unsafe.Pointer(&b[0]), C.size_t(len(b)))
-		if n1 < 0 {
-			panic(n1)
-		}
+		var n1 int
+		n1, err = c.writeNoWait(b)
 		b = b[n1:]
-		n += int(n1)
-		if n1 == 0 {
-			if !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline) {
-				return n, errDeadlineExceeded{}
-			}
-			c.cond.Wait()
+		n += n1
+		if err != nil {
+			break
 		}
+		if n1 != 0 {
+			continue
+		}
+		if !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline) {
+			err = errDeadlineExceeded{}
+			break
+		}
+		c.cond.Wait()
 	}
-	return n, nil
+	return
 }
 
 func (c *Conn) RemoteAddr() net.Addr {

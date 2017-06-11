@@ -41,7 +41,9 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 
 //export errorCallback
 func errorCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("error callback: socket %p: %s", a.socket, libErrorCodeNames(a.error_code()))
+	codeName := libErrorCodeNames(a.error_code())
+	// log.Printf("error callback: socket %p: %s", a.socket, codeName)
+	libContextToSocket[a.context].conns[a.socket].onLibError(codeName)
 	return 0
 }
 
