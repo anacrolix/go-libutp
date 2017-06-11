@@ -6,6 +6,7 @@ package utp
 import "C"
 import (
 	"errors"
+	"log"
 	"net"
 	"time"
 )
@@ -46,10 +47,11 @@ func NewSocket(network, addr string) (*Socket, error) {
 	// ctx.setOption(C.UTP_LOG_MTU, 1)
 	// ctx.setOption(C.UTP_LOG_DEBUG, 1)
 	s := &Socket{
-		pc:      pc,
-		ctx:     ctx,
-		backlog: make(chan *Conn, 5),
-		conns:   make(map[*C.utp_socket]*Conn),
+		pc:          pc,
+		ctx:         ctx,
+		backlog:     make(chan *Conn, 5),
+		conns:       make(map[*C.utp_socket]*Conn),
+		nonUtpReads: make(chan packet, 10),
 	}
 	libContextToSocket[ctx] = s
 	go s.packetReader()
@@ -182,6 +184,7 @@ func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
 	select {
 	case s.nonUtpReads <- packet{b, from}:
 	default:
+		log.Printf("dropped non utp packet: no room in buffer")
 	}
 }
 
