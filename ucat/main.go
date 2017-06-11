@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
-	"sync"
+	"time"
 
 	_ "github.com/anacrolix/envpprof"
 
@@ -58,18 +58,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
-	var wg sync.WaitGroup
-	wg.Add(2)
+	doneReading := make(chan struct{})
+	doneWriting := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		defer c.Close()
-		log.Println(io.Copy(os.Stdout, c))
+		defer close(doneReading)
+		n, err := io.Copy(os.Stdout, c)
+		log.Printf("read %d bytes then got error: %v", n, err)
 	}()
 	go func() {
-		defer wg.Done()
-		log.Println(io.Copy(c, os.Stdin))
-		c.Close()
+		defer close(doneWriting)
+		n, err := io.Copy(c, os.Stdin)
+		log.Printf("wrote %d bytes then got error: %v", n, err)
 	}()
-	wg.Wait()
+	select {
+	case <-doneReading:
+	case <-doneWriting:
+	}
+	c.Close()
+	time.Sleep(time.Second)
 }
