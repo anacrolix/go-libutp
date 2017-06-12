@@ -92,7 +92,10 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 	c.readBuf = c.readBuf[n:]
 	if n != 0 && len(c.readBuf) == 0 {
 		// Can we call this if the utp_socket is closed, destroyed or errored?
-		C.utp_read_drained(c.s)
+		if c.s != nil {
+			C.utp_read_drained(c.s)
+			// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
+		}
 	}
 	err = func() error {
 		switch {
