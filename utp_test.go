@@ -2,9 +2,11 @@ package utp
 
 import (
 	"log"
+	"math/rand"
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	_ "github.com/anacrolix/envpprof"
 
@@ -29,9 +31,14 @@ func TestNettestLocalhostUDP(t *testing.T) {
 	})
 }
 
-func connPairSocket(s *Socket) (dialed, accepted net.Conn) {
-	var wg sync.WaitGroup
-	wg.Add(1)
+var rander = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func connPairSocket(s *Socket) (net.Conn, net.Conn) {
+	var (
+		wg               sync.WaitGroup
+		dialed, accepted net.Conn
+	)
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		var err error
@@ -40,10 +47,23 @@ func connPairSocket(s *Socket) (dialed, accepted net.Conn) {
 			panic(err)
 		}
 	}()
-	accepted, err := s.Accept()
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		defer wg.Done()
+		var err error
+		accepted, err = s.Accept()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	wg.Wait()
-	return
+	switch rander.Intn(2) {
+	case 0:
+		log.Printf("first of conn pair is dialed")
+		return dialed, accepted
+	case 1:
+		log.Print("first of conn pair is accepted")
+		return accepted, dialed
+	default:
+		panic("ಠ_ಠ")
+	}
 }
