@@ -83,7 +83,12 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 func readCallback(a *C.utp_callback_arguments) C.uint64 {
 	s := libContextToSocket[a.context]
 	c := s.conns[a.socket]
-	c.readBuf = append(c.readBuf, a.bufBytes()...)
+	b := a.bufBytes()
+	// log.Printf("read callback: conn %p: %d bytes", c, len(b))
+	if len(b) == 0 {
+		panic("that will break the read drain invariant")
+	}
+	c.readBuf = append(c.readBuf, b...)
 	c.cond.Broadcast()
 	return 0
 }
