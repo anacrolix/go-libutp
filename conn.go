@@ -116,6 +116,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 	for {
 		n, err := c.readNoWait(b)
 		if n != 0 || len(b) == 0 || err != nil {
+			// log.Printf("conn %p: read %d bytes: %s", c, n, err)
 			return n, err
 		}
 		c.cond.Wait()
@@ -144,10 +145,13 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	if n < 0 {
 		panic(n)
 	}
+	// log.Print(n)
 	return
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
+	// defer func() { log.Printf("wrote %d bytes: %s", n, err) }()
+	// log.Print(len(b))
 	mu.Lock()
 	defer mu.Unlock()
 	for len(b) != 0 {

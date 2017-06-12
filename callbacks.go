@@ -22,12 +22,16 @@ func (a *C.utp_callback_arguments) error_code() C.int {
 	return *(*C.int)(unsafe.Pointer(&a.anon0))
 }
 
+var sends int
+
 //export sendtoCallback
 func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	s := getSocketForLibContext(a.context)
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
+	sends++
+	// log.Printf("sending %d bytes, %d packets", len(b), sends)
 	n, err := s.pc.WriteTo(b, addr)
 	if err != nil {
 		log.Printf("error sending packet: %s", err)

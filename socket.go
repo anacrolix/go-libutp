@@ -73,6 +73,8 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	return c
 }
 
+var reads int
+
 func (s *Socket) packetReader() {
 	for {
 		b := make([]byte, 0x1000)
@@ -86,6 +88,8 @@ func (s *Socket) packetReader() {
 			}
 			panic(err)
 		}
+		reads++
+		// log.Printf("received %d bytes, %d packets", n, reads)
 		sa, sal := netAddrToLibSockaddr(addr)
 		func() {
 			mu.Lock()
