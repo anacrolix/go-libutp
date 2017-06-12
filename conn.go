@@ -32,6 +32,9 @@ type Conn struct {
 	writeDeadlineTimer *time.Timer
 	readDeadline       time.Time
 	readDeadlineTimer  *time.Timer
+
+	numBytesRead    int64
+	numBytesWritten int64
 }
 
 func (c *Conn) onLibError(codeName string) {
@@ -115,6 +118,8 @@ func (c *Conn) Read(b []byte) (int, error) {
 	defer mu.Unlock()
 	for {
 		n, err := c.readNoWait(b)
+		c.numBytesRead += int64(n)
+		// log.Printf("read %d bytes", c.numBytesRead)
 		if n != 0 || len(b) == 0 || err != nil {
 			// log.Printf("conn %p: read %d bytes: %s", c, n, err)
 			return n, err
@@ -167,6 +172,8 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		}
 		c.cond.Wait()
 	}
+	c.numBytesWritten += int64(n)
+	// log.Printf("wrote %d bytes", c.numBytesWritten)
 	return
 }
 
