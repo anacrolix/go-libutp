@@ -129,6 +129,8 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 			return errors.New("closed")
 		case c.destroyed:
 			return errors.New("destroyed")
+		case !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline):
+			return errDeadlineExceeded{}
 		default:
 			return nil
 		}
@@ -156,10 +158,6 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		}
 		if n1 != 0 {
 			continue
-		}
-		if !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline) {
-			err = errDeadlineExceeded{}
-			break
 		}
 		c.cond.Wait()
 	}
