@@ -97,6 +97,9 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 			// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 		}
 	}
+	if len(c.readBuf) != 0 {
+		return
+	}
 	err = func() error {
 		switch {
 		case c.gotEOF:
