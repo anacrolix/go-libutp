@@ -29,13 +29,13 @@ func TestNettestLocalhostUDP(t *testing.T) {
 	})
 }
 
-func connPairSocket(s *Socket) (initer, accepted net.Conn) {
+func connPairSocket(s *Socket) (dialed, accepted net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		var err error
-		initer, err = s.Dial(s.Addr().String())
+		dialed, err = s.Dial(s.Addr().String())
 		if err != nil {
 			panic(err)
 		}
