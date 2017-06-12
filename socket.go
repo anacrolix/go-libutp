@@ -68,6 +68,8 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	}
 	c.cond.L = &mu
 	s.conns[us] = c
+	c.writeDeadlineTimer = time.AfterFunc(-1, c.cond.Broadcast)
+	c.readDeadlineTimer = time.AfterFunc(-1, c.cond.Broadcast)
 	return c
 }
 

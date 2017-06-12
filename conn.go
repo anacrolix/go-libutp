@@ -28,8 +28,10 @@ type Conn struct {
 	closed   bool
 	libError error
 
-	writeDeadline time.Time
-	readDeadline  time.Time
+	writeDeadline      time.Time
+	writeDeadlineTimer *time.Timer
+	readDeadline       time.Time
+	readDeadlineTimer  *time.Timer
 }
 
 func (c *Conn) onLibError(codeName string) {
@@ -180,6 +182,14 @@ func (c *Conn) SetDeadline(t time.Time) error {
 	defer mu.Unlock()
 	c.readDeadline = t
 	c.writeDeadline = t
+	if t.IsZero() {
+		c.readDeadlineTimer.Stop()
+		c.writeDeadlineTimer.Stop()
+	} else {
+		d := t.Sub(time.Now())
+		c.readDeadlineTimer.Reset(d)
+		c.writeDeadlineTimer.Reset(d)
+	}
 	c.cond.Broadcast()
 	return nil
 }
@@ -187,6 +197,12 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 	mu.Lock()
 	defer mu.Unlock()
 	c.readDeadline = t
+	if t.IsZero() {
+		c.readDeadlineTimer.Stop()
+	} else {
+		d := t.Sub(time.Now())
+		c.readDeadlineTimer.Reset(d)
+	}
 	c.cond.Broadcast()
 	return nil
 }
@@ -194,6 +210,12 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	mu.Lock()
 	defer mu.Unlock()
 	c.writeDeadline = t
+	if t.IsZero() {
+		c.writeDeadlineTimer.Stop()
+	} else {
+		d := t.Sub(time.Now())
+		c.writeDeadlineTimer.Reset(d)
+	}
 	c.cond.Broadcast()
 	return nil
 }
