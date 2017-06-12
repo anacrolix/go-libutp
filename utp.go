@@ -3,7 +3,10 @@ package utp
 /*
 #cgo CPPFLAGS: -DPOSIX -DUTP_DEBUG_LOGGING=0
 #cgo CFLAGS: -Wall -O3 -fno-exceptions
+// These are all copied from the libutp Makefile.
 #cgo CXXFLAGS: -Wall -O3 -fno-exceptions -fPIC -fno-rtti -Wno-sign-compare -fpermissive
+// There are some variables that aren't used unless UTP_DEBUG_LOGGING is defined.
+#cgo CXXFLAGS: -Wno-unused-const-variable
 #include "utp.h"
 
 uint64_t errorCallback(utp_callback_arguments *);
