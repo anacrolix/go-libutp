@@ -61,6 +61,11 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
 		c.setConnected()
+		// A dialled connection will not tell the remote it's ready until it
+		// writes. If the dialer has no intention of writing, this will stall
+		// everything. We do an empty write to get things rolling again. This
+		// circumstance occurs when c1 in the RacyRead nettest is the dialer.
+		C.utp_write(a.socket, nil, 0)
 	case C.UTP_STATE_WRITABLE:
 		c.cond.Broadcast()
 	case C.UTP_STATE_EOF:
