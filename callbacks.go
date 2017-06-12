@@ -59,9 +59,9 @@ func logCallback(a *C.utp_callback_arguments) C.uint64 {
 
 //export stateChangeCallback
 func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
-	// log.Printf("state changed: socket %p: %s", a.socket, libStateName(a.state()))
 	s := libContextToSocket[a.context]
 	c := s.conns[a.socket]
+	// log.Printf("state changed: conn %p: %s", c, libStateName(a.state()))
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
 		c.setConnected()
