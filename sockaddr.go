@@ -15,17 +15,17 @@ import (
 func toSockaddrInet(ip net.IP, port int, zone string) (*C.struct_sockaddr, C.socklen_t) {
 	if ip4 := ip.To4(); ip4 != nil && zone == "" {
 		rsa := syscall.RawSockaddrInet4{
-			Len:    syscall.SizeofSockaddrInet4,
+			// Len:    syscall.SizeofSockaddrInet4,
 			Family: syscall.AF_INET,
 			Port:   uint16(port),
 		}
 		if n := copy(rsa.Addr[:], ip4); n != 4 {
 			panic(n)
 		}
-		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(rsa.Len)
+		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(syscall.SizeofSockaddrInet4)
 	}
 	rsa := syscall.RawSockaddrInet6{
-		Len:      syscall.SizeofSockaddrInet6,
+		// Len:      syscall.SizeofSockaddrInet6,
 		Family:   syscall.AF_INET6,
 		Scope_id: zoneToScopeId(zone),
 		Port:     uint16(port),
@@ -33,7 +33,7 @@ func toSockaddrInet(ip net.IP, port int, zone string) (*C.struct_sockaddr, C.soc
 	if n := copy(rsa.Addr[:], ip); n != 16 {
 		panic(n)
 	}
-	return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(rsa.Len)
+	return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(syscall.SizeofSockaddrInet6)
 }
 
 func zoneToScopeId(zone string) uint32 {
@@ -58,44 +58,6 @@ func structSockaddrToUDPAddr(sa *C.struct_sockaddr) *net.UDPAddr {
 func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error) {
 	// log.Printf("anyToSockaddr %#v", rsa)
 	switch rsa.Addr.Family {
-	case syscall.AF_LINK:
-		pp := (*syscall.RawSockaddrDatalink)(unsafe.Pointer(rsa))
-		sa := new(syscall.SockaddrDatalink)
-		sa.Len = pp.Len
-		sa.Family = pp.Family
-		sa.Index = pp.Index
-		sa.Type = pp.Type
-		sa.Nlen = pp.Nlen
-		sa.Alen = pp.Alen
-		sa.Slen = pp.Slen
-		for i := 0; i < len(sa.Data); i++ {
-			sa.Data[i] = pp.Data[i]
-		}
-		return sa, nil
-
-	case syscall.AF_UNIX:
-		pp := (*syscall.RawSockaddrUnix)(unsafe.Pointer(rsa))
-		if pp.Len < 2 || pp.Len > syscall.SizeofSockaddrUnix {
-			return nil, syscall.EINVAL
-		}
-		sa := new(syscall.SockaddrUnix)
-
-		// Some BSDs include the trailing NUL in the length, whereas
-		// others do not. Work around this by subtracting the leading
-		// family and len. The path is then scanned to see if a NUL
-		// terminator still exists within the length.
-		n := int(pp.Len) - 2 // subtract leading Family, Len
-		for i := 0; i < n; i++ {
-			if pp.Path[i] == 0 {
-				// found early NUL; assume Len included the NUL
-				// or was overestimating.
-				n = i
-				break
-			}
-		}
-		bytes := (*[10000]byte)(unsafe.Pointer(&pp.Path[0]))[0:n]
-		sa.Name = string(bytes)
-		return sa, nil
 
 	case syscall.AF_INET:
 		pp := (*syscall.RawSockaddrInet4)(unsafe.Pointer(rsa))
