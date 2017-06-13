@@ -6,7 +6,6 @@ package utp
 import "C"
 import (
 	"errors"
-	"log"
 	"net"
 	"time"
 )
@@ -198,7 +197,7 @@ func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
 	select {
 	case s.nonUtpReads <- packet{b, from}:
 	default:
-		log.Printf("dropped non utp packet: no room in buffer")
+		// log.Printf("dropped non utp packet: no room in buffer")
 		nonUtpPacketsDropped.Add(1)
 	}
 }
