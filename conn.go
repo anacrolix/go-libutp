@@ -6,7 +6,6 @@ package utp
 import "C"
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"sync"
