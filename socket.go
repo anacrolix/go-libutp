@@ -51,7 +51,7 @@ func NewSocket(network, addr string) (*Socket, error) {
 		ctx:         ctx,
 		backlog:     make(chan *Conn, 5),
 		conns:       make(map[*C.utp_socket]*Conn),
-		nonUtpReads: make(chan packet, 10),
+		nonUtpReads: make(chan packet, 100),
 	}
 	libContextToSocket[ctx] = s
 	go s.packetReader()
