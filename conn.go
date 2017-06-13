@@ -72,7 +72,6 @@ func (c *Conn) close() {
 	}
 	if !c.destroyed {
 		C.utp_close(c.s)
-		c.s = nil
 	}
 	c.closed = true
 	c.cond.Broadcast()
