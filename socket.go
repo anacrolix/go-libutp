@@ -114,6 +114,7 @@ func (s *Socket) timeoutChecker() {
 			mu.Unlock()
 			return
 		}
+		// C.utp_issue_deferred_acks(s.ctx)
 		C.utp_check_timeouts(s.ctx)
 		mu.Unlock()
 		time.Sleep(500 * time.Millisecond)

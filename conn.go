@@ -66,11 +66,13 @@ func (c *Conn) Close() (err error) {
 }
 
 func (c *Conn) close() {
+	// log.Printf("conn %p: closed", c)
 	if c.closed {
 		return
 	}
 	if !c.destroyed {
 		C.utp_close(c.s)
+		// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 	}
 	c.closed = true
 	c.cond.Broadcast()
@@ -152,6 +154,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 		panic(n)
 	}
 	// log.Print(n)
+	// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 	return
 }
 
