@@ -38,9 +38,6 @@ type Conn struct {
 }
 
 func (c *Conn) onLibError(codeName string) {
-	if c.libError != nil {
-		panic(fmt.Sprintf("multiple lib errors: got %s, have %s", codeName, c.libError))
-	}
 	c.libError = errors.New(codeName)
 	c.cond.Broadcast()
 }
