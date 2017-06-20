@@ -87,12 +87,12 @@ func (s *Socket) packetReader() {
 			}
 			panic(err)
 		}
-		reads++
-		// log.Printf("received %d bytes, %d packets", n, reads)
 		sa, sal := netAddrToLibSockaddr(addr)
 		func() {
 			mu.Lock()
 			defer mu.Unlock()
+			reads++
+			// log.Printf("received %d bytes, %d packets", n, reads)
 			if s.closed {
 				return
 			}
