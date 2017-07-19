@@ -42,9 +42,11 @@ func NewSocket(network, addr string) (*Socket, error) {
 		panic(ctx)
 	}
 	ctx.setCallbacks()
-	// ctx.setOption(C.UTP_LOG_NORMAL, 1)
-	// ctx.setOption(C.UTP_LOG_MTU, 1)
-	// ctx.setOption(C.UTP_LOG_DEBUG, 1)
+	if utpLogging {
+		ctx.setOption(C.UTP_LOG_NORMAL, 1)
+		ctx.setOption(C.UTP_LOG_MTU, 1)
+		ctx.setOption(C.UTP_LOG_DEBUG, 1)
+	}
 	s := &Socket{
 		pc:          pc,
 		ctx:         ctx,
