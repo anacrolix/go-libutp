@@ -5,6 +5,7 @@ package utp
 */
 import "C"
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -46,13 +47,22 @@ func (c *Conn) setConnected() {
 	c.cond.Broadcast()
 }
 
-func (c *Conn) waitForConnect() error {
+func (c *Conn) waitForConnect(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		c.cond.Broadcast()
+	}()
 	for {
 		if c.libError != nil {
 			return c.libError
 		}
 		if c.gotConnect {
 			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		c.cond.Wait()
 	}

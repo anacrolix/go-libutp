@@ -5,6 +5,7 @@ package utp
 */
 import "C"
 import (
+	"context"
 	"errors"
 	"net"
 	"time"
@@ -55,6 +56,7 @@ func NewSocket(network, addr string) (*Socket, error) {
 		nonUtpReads: make(chan packet, 100),
 	}
 	libContextToSocket[ctx] = s
+	go s.timeoutChecker()
 	go s.packetReader()
 	return s, nil
 }
@@ -159,6 +161,16 @@ func (s *Socket) Dial(addr string) (net.Conn, error) {
 }
 
 func (s *Socket) DialTimeout(addr string, timeout time.Duration) (net.Conn, error) {
+	ctx := context.Background()
+	if timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	return s.DialContext(ctx, addr)
+}
+
+func (s *Socket) DialContext(ctx context.Context, addr string) (net.Conn, error) {
 	ua, err := net.ResolveUDPAddr(s.Addr().Network(), addr)
 	if err != nil {
 		panic(err)
@@ -168,7 +180,7 @@ func (s *Socket) DialTimeout(addr string, timeout time.Duration) (net.Conn, erro
 	c := s.newConn(C.utp_create_socket(s.ctx))
 	C.utp_connect(c.s, sa, sl)
 	defer mu.Unlock()
-	err = c.waitForConnect()
+	err = c.waitForConnect(ctx)
 	if err != nil {
 		c.close()
 		return nil, err
