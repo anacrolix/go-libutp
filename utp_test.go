@@ -9,6 +9,8 @@ import (
 	"time"
 
 	_ "github.com/anacrolix/envpprof"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"golang.org/x/net/nettest"
 )
@@ -66,4 +68,29 @@ func connPairSocket(s *Socket) (net.Conn, net.Conn) {
 	default:
 		panic("ಠ_ಠ")
 	}
+}
+
+const neverResponds = "localhost:1"
+
+// Ensure that libutp dial timeouts out by itself.
+func TestLibutpDialTimesOut(t *testing.T) {
+	t.Parallel()
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	_, err = s.Dial(neverResponds)
+	require.Error(t, err)
+}
+
+// Ensure that our timeout is honored during dialing.
+func TestDialTimeout(t *testing.T) {
+	t.Parallel()
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	started := time.Now()
+	_, err = s.DialTimeout(neverResponds, time.Second)
+	require.Error(t, err)
+	t.Log(err)
+	assert.True(t, time.Now().Before(started.Add(2*time.Second)))
 }
