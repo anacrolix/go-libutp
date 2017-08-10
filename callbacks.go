@@ -32,15 +32,15 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	addr := structSockaddrToUDPAddr(sa)
 	sends++
 	if logCallbacks {
-		log.Printf("sending %d bytes, %d packets", len(b), sends)
+		Logger.Printf("sending %d bytes, %d packets", len(b), sends)
 	}
 	n, err := s.pc.WriteTo(b, addr)
 	if err != nil {
-		log.Printf("error sending packet: %s", err)
+		Logger.Printf("error sending packet: %s", err)
 		return
 	}
 	if n != len(b) {
-		log.Printf("expected to send %d bytes but only sent %d", len(b), n)
+		Logger.Printf("expected to send %d bytes but only sent %d", len(b), n)
 	}
 	return
 }
@@ -57,7 +57,7 @@ func errorCallback(a *C.utp_callback_arguments) C.uint64 {
 
 //export logCallback
 func logCallback(a *C.utp_callback_arguments) C.uint64 {
-	log.Printf("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
+	Logger.Printf("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
 	return 0
 }
 
@@ -66,7 +66,7 @@ func stateChangeCallback(a *C.utp_callback_arguments) C.uint64 {
 	s := libContextToSocket[a.context]
 	c := s.conns[a.socket]
 	if logCallbacks {
-		log.Printf("state changed: conn %p: %s", c, libStateName(a.state()))
+		Logger.Printf("state changed: conn %p: %s", c, libStateName(a.state()))
 	}
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
