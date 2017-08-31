@@ -79,9 +79,9 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 var reads int
 
 func (s *Socket) packetReader() {
+	var b [0x1000]byte
 	for {
-		b := make([]byte, 0x1000)
-		n, addr, err := s.pc.ReadFrom(b)
+		n, addr, err := s.pc.ReadFrom(b[:])
 		if err != nil {
 			mu.Lock()
 			closed := s.closed
