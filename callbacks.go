@@ -100,7 +100,7 @@ func readCallback(a *C.utp_callback_arguments) C.uint64 {
 	if len(b) == 0 {
 		panic("that will break the read drain invariant")
 	}
-	c.readBuf = append(c.readBuf, b...)
+	c.readBuf.Write(b)
 	c.cond.Broadcast()
 	return 0
 }

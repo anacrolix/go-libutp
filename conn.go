@@ -5,6 +5,7 @@ package utp
 */
 import "C"
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -18,7 +19,7 @@ import (
 type Conn struct {
 	s          *C.utp_socket
 	cond       sync.Cond
-	readBuf    []byte
+	readBuf    bytes.Buffer
 	gotEOF     bool
 	gotConnect bool
 	// Set on state changed to UTP_STATE_DESTROYING. Not valid to refer to the
@@ -95,16 +96,15 @@ func (c *Conn) LocalAddr() net.Addr {
 }
 
 func (c *Conn) readNoWait(b []byte) (n int, err error) {
-	n = copy(b, c.readBuf)
-	c.readBuf = c.readBuf[n:]
-	if n != 0 && len(c.readBuf) == 0 {
+	n, _ = c.readBuf.Read(b)
+	if n != 0 && c.readBuf.Len() == 0 {
 		// Can we call this if the utp_socket is closed, destroyed or errored?
 		if c.s != nil {
 			C.utp_read_drained(c.s)
 			// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 		}
 	}
-	if len(c.readBuf) != 0 {
+	if c.readBuf.Len() != 0 {
 		return
 	}
 	err = func() error {
