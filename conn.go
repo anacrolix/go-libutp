@@ -255,3 +255,18 @@ func (c *Conn) onDestroyed() {
 	c.s = nil
 	c.cond.Broadcast()
 }
+
+func (c *Conn) WriteBufferLen() int {
+	mu.Lock()
+	defer mu.Unlock()
+	return int(C.utp_getsockopt(c.s, C.UTP_SNDBUF))
+}
+
+func (c *Conn) SetWriteBufferLen(len int) {
+	mu.Lock()
+	defer mu.Unlock()
+	i := C.utp_setsockopt(c.s, C.UTP_SNDBUF, C.int(len))
+	if i != 0 {
+		panic(i)
+	}
+}

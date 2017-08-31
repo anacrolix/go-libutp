@@ -232,3 +232,24 @@ func (s *Socket) SetDeadline(t time.Time) error {
 func (s *Socket) WriteTo(b []byte, addr net.Addr) (int, error) {
 	return s.pc.WriteTo(b, addr)
 }
+
+func (s *Socket) ReadBufferLen() int {
+	mu.Lock()
+	defer mu.Unlock()
+	return int(C.utp_context_get_option(s.ctx, C.UTP_RCVBUF))
+}
+
+func (s *Socket) WriteBufferLen() int {
+	mu.Lock()
+	defer mu.Unlock()
+	return int(C.utp_context_get_option(s.ctx, C.UTP_SNDBUF))
+}
+
+func (s *Socket) SetWriteBufferLen(len int) {
+	mu.Lock()
+	defer mu.Unlock()
+	i := C.utp_context_set_option(s.ctx, C.UTP_SNDBUF, C.int(len))
+	if i != 0 {
+		panic(i)
+	}
+}
