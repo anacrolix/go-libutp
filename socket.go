@@ -210,7 +210,7 @@ func (s *Socket) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
 func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
 	socketNonUtpPacketsReceived.Add(1)
 	select {
-	case s.nonUtpReads <- packet{b, from}:
+	case s.nonUtpReads <- packet{append([]byte(nil), b...), from}:
 	default:
 		// log.Printf("dropped non utp packet: no room in buffer")
 		nonUtpPacketsDropped.Add(1)
