@@ -218,15 +218,15 @@ func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
 }
 
 func (s *Socket) SetReadDeadline(t time.Time) error {
-	return errors.New("not implemented")
+	panic("not implemented")
 }
 
 func (s *Socket) SetWriteDeadline(t time.Time) error {
-	return errors.New("not implemented")
+	panic("not implemented")
 }
 
 func (s *Socket) SetDeadline(t time.Time) error {
-	return errors.New("not implemented")
+	panic("not implemented")
 }
 
 func (s *Socket) WriteTo(b []byte, addr net.Addr) (int, error) {
