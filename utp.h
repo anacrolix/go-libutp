@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
+#include <stdint.h>
+#endif
+
 #include <stdarg.h>
 #include "utp_types.h"
 

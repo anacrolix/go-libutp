@@ -7,6 +7,9 @@ package utp
 #cgo CXXFLAGS: -Wall -O3 -fno-exceptions -fPIC -fno-rtti -Wno-sign-compare -fpermissive
 // There are some variables that aren't used unless UTP_DEBUG_LOGGING is defined.
 #cgo CXXFLAGS: -Wno-unused-const-variable
+// Windows additional flags
+#cgo windows LDFLAGS: -lws2_32
+#cgo windows CXXFLAGS: -D_WIN32_WINNT=0x600
 #include "utp.h"
 
 uint64_t errorCallback(utp_callback_arguments *);
