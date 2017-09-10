@@ -1,0 +1,14 @@
+
+language: go
+go:
+- 1.9
+
+install:
+  - cd $GOPATH/src/github.com/$TRAVIS_REPO_SLUG
+  - go get github.com/anacrolix/envpprof
+  - go get github.com/anacrolix/tagflag
+  - go get github.com/stretchr/testify/assert
+  - go build -i -v
+
+script:
+  - go test -v
