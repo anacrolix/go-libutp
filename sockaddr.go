@@ -22,7 +22,7 @@ func toSockaddrInet(ip net.IP, port int, zone string) (*C.struct_sockaddr, C.soc
 		if n := copy(rsa.Addr[:], ip4); n != 4 {
 			panic(n)
 		}
-		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(syscall.SizeofSockaddrInet4)
+		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
 	}
 	rsa := syscall.RawSockaddrInet6{
 		// Len:      syscall.SizeofSockaddrInet6,
@@ -33,7 +33,7 @@ func toSockaddrInet(ip net.IP, port int, zone string) (*C.struct_sockaddr, C.soc
 	if n := copy(rsa.Addr[:], ip); n != 16 {
 		panic(n)
 	}
-	return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(syscall.SizeofSockaddrInet6)
+	return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
 }
 
 func zoneToScopeId(zone string) uint32 {
