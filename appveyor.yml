@@ -6,7 +6,10 @@ environment:
 
 install:
   - set PATH=%GOPATH%\bin;%PATH%
+  - set PATH=C:\go14-x86;%GOPATH%\bin;%PATH%
   - set PATH=C:\msys64\mingw64\bin;%PATH%
+  - go version
+  - go env
   - go get github.com/anacrolix/envpprof
   - go get github.com/anacrolix/tagflag
   - go get github.com/stretchr/testify/assert
