@@ -7,6 +7,7 @@ import "C"
 import (
 	"log"
 	"reflect"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -22,7 +23,7 @@ func (a *C.utp_callback_arguments) error_code() C.int {
 	return *(*C.int)(unsafe.Pointer(&a.anon0))
 }
 
-var sends int
+var sends int64
 
 //export sendtoCallback
 func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
@@ -30,7 +31,7 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
-	sends++
+	atomic.AddInt64(&sends, 1)
 	if logCallbacks {
 		Logger.Printf("sending %d bytes, %d packets", len(b), sends)
 	}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
@@ -76,7 +77,7 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	return c
 }
 
-var reads int
+var reads int64
 
 func (s *Socket) packetReader() {
 	var b [0x1000]byte
@@ -92,11 +93,11 @@ func (s *Socket) packetReader() {
 			panic(err)
 		}
 		sa, sal := netAddrToLibSockaddr(addr)
+		atomic.AddInt64(&reads, 1)
+		// log.Printf("received %d bytes, %d packets", n, reads)
 		func() {
 			mu.Lock()
 			defer mu.Unlock()
-			reads++
-			// log.Printf("received %d bytes, %d packets", n, reads)
 			if s.closed {
 				return
 			}
