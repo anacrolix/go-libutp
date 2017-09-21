@@ -95,3 +95,39 @@ func TestDialTimeout(t *testing.T) {
 	t.Log(err)
 	assert.True(t, time.Now().Before(started.Add(2*time.Second)))
 }
+
+func TestConnSendBuffer(t *testing.T) {
+	s0, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s0.Close()
+	s1, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s1.Close()
+	var (
+		c1        net.Conn
+		acceptErr error
+		accepted  = make(chan struct{})
+	)
+	go func() {
+		defer close(accepted)
+		c1, acceptErr = s1.Accept()
+	}()
+	c0, err := s0.Dial(s1.Addr().String())
+	require.NoError(t, err)
+	<-accepted
+	require.NoError(t, acceptErr)
+	defer c0.Close()
+	defer c1.Close()
+	buf := make([]byte, 1024)
+	written := 0
+	for {
+		require.NoError(t, c0.SetWriteDeadline(time.Now().Add(time.Second)))
+		n, err := c0.Write(buf)
+		written += n
+		if err != nil {
+			t.Logf("stopped writing after error: %s", err)
+			break
+		}
+	}
+	t.Logf("write buffered %d bytes", written)
+}
