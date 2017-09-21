@@ -18,6 +18,7 @@ uint64_t acceptCallback(utp_callback_arguments *);
 uint64_t sendtoCallback(utp_callback_arguments *);
 uint64_t stateChangeCallback(utp_callback_arguments *);
 uint64_t readCallback(utp_callback_arguments *);
+uint64_t getReadBufferSizeCallback(utp_callback_arguments *);
 */
 import "C"
 import "unsafe"
@@ -31,6 +32,7 @@ func (ctx *C.utp_context) setCallbacks() {
 	C.utp_set_callback(ctx, C.UTP_ON_STATE_CHANGE, (*C.utp_callback_t)(C.stateChangeCallback))
 	C.utp_set_callback(ctx, C.UTP_ON_READ, (*C.utp_callback_t)(C.readCallback))
 	C.utp_set_callback(ctx, C.UTP_ON_ERROR, (*C.utp_callback_t)(C.errorCallback))
+	C.utp_set_callback(ctx, C.UTP_GET_READ_BUFFER_SIZE, (*C.utp_callback_t)(C.getReadBufferSizeCallback))
 }
 
 func (ctx *C.utp_context) setOption(opt, val int) int {

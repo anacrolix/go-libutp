@@ -115,3 +115,17 @@ func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 	s.pushBacklog(s.newConn(a.socket))
 	return 0
 }
+
+//export getReadBufferSizeCallback
+func getReadBufferSizeCallback(a *C.utp_callback_arguments) (ret C.uint64) {
+	s := libContextToSocket[a.context]
+	c := s.conns[a.socket]
+	if c == nil {
+		// socket hasn't been added to the Socket.conns yet. The read buffer
+		// starts out empty, and the default implementation for this callback
+		// returns 0, so we'll return that.
+		return 0
+	}
+	ret = C.uint64(c.readBuf.Len())
+	return
+}
