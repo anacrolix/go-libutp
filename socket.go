@@ -82,6 +82,9 @@ var reads int64
 func (s *Socket) packetReader() {
 	var b [0x1000]byte
 	for {
+		// In C, all the reads are processed and when it threatens to block,
+		// only then do we call utp_issue_deferred_acks. I don't know how we
+		// can do this in Go.
 		n, addr, err := s.pc.ReadFrom(b[:])
 		if err != nil {
 			mu.Lock()
