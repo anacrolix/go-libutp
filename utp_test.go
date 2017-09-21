@@ -76,6 +76,9 @@ const neverResponds = "localhost:1"
 // Ensure that libutp dial timeouts out by itself.
 func TestLibutpDialTimesOut(t *testing.T) {
 	t.Parallel()
+	if testing.Short() {
+		t.SkipNow()
+	}
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
