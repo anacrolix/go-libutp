@@ -104,13 +104,17 @@ func (s *Socket) packetReader() {
 			if s.closed {
 				return
 			}
-			if C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal) != 0 {
+			ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal)
+			switch ret {
+			case 1:
 				socketUtpPacketsReceived.Add(1)
-			} else {
+				C.utp_issue_deferred_acks(s.ctx)
+				C.utp_check_timeouts(s.ctx)
+			case 0:
 				s.onReadNonUtp(b[:n], addr)
+			default:
+				panic(ret)
 			}
-			C.utp_issue_deferred_acks(s.ctx)
-			C.utp_check_timeouts(s.ctx)
 		}()
 	}
 }
