@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/anacrolix/missinggo/inproc"
+
 	"unsafe"
 )
 
@@ -98,6 +100,15 @@ func sockaddrToUDP(sa syscall.Sockaddr) net.Addr {
 }
 
 func netAddrToLibSockaddr(na net.Addr) (*C.struct_sockaddr, C.socklen_t) {
-	ua := na.(*net.UDPAddr)
-	return toSockaddrInet(ua.IP, ua.Port, ua.Zone)
+	switch v := na.(type) {
+	case *net.UDPAddr:
+		return toSockaddrInet(v.IP, v.Port, v.Zone)
+	case inproc.Addr:
+		rsa := syscall.RawSockaddrInet6{
+			Port: uint16(v.Port),
+		}
+		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
+	default:
+		panic(na)
+	}
 }

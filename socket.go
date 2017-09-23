@@ -10,6 +10,8 @@ import (
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/anacrolix/missinggo/inproc"
 )
 
 type Socket struct {
@@ -32,8 +34,15 @@ type packet struct {
 	from net.Addr
 }
 
+func listenPacket(network, addr string) (pc net.PacketConn, err error) {
+	if network == "inproc" {
+		return inproc.ListenPacket(network, addr)
+	}
+	return net.ListenPacket(network, addr)
+}
+
 func NewSocket(network, addr string) (*Socket, error) {
-	pc, err := net.ListenPacket(network, addr)
+	pc, err := listenPacket(network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +187,18 @@ func (s *Socket) DialTimeout(addr string, timeout time.Duration) (net.Conn, erro
 	return s.DialContext(ctx, addr)
 }
 
+func (s *Socket) resolveAddr(addr string) (net.Addr, error) {
+	n := s.Addr().Network()
+	switch n {
+	case "inproc":
+		return inproc.ResolveAddr(n, addr)
+	default:
+		return net.ResolveUDPAddr(n, addr)
+	}
+}
+
 func (s *Socket) DialContext(ctx context.Context, addr string) (net.Conn, error) {
-	ua, err := net.ResolveUDPAddr(s.Addr().Network(), addr)
+	ua, err := s.resolveAddr(addr)
 	if err != nil {
 		panic(err)
 	}

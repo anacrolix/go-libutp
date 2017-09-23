@@ -21,7 +21,7 @@ func init() {
 
 func doNettestTestConn(t *testing.T, swapConns bool) {
 	nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-		s, err := NewSocket("udp", "localhost:0")
+		s, err := NewSocket("inproc", "localhost:0")
 		if err != nil {
 			return
 		}
