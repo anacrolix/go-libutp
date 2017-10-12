@@ -148,6 +148,8 @@ func (me *Socket) Close() error {
 	if me.closed {
 		return nil
 	}
+	// Calling this deletes the pointer. It must not be referred to after
+	// this.
 	C.utp_destroy(me.ctx)
 	me.ctx = nil
 	me.pc.Close()
@@ -204,9 +206,12 @@ func (s *Socket) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	}
 	sa, sl := netAddrToLibSockaddr(ua)
 	mu.Lock()
+	defer mu.Unlock()
+	if s.closed {
+		return nil, errors.New("socket closed")
+	}
 	c := s.newConn(C.utp_create_socket(s.ctx))
 	C.utp_connect(c.s, sa, sl)
-	defer mu.Unlock()
 	err = c.waitForConnect(ctx)
 	if err != nil {
 		c.close()
