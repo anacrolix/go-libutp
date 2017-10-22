@@ -7,6 +7,7 @@ import "C"
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"sync/atomic"
 	"time"
@@ -102,7 +103,12 @@ func (s *Socket) packetReader() {
 			if closed {
 				return
 			}
-			panic(err)
+			// See https://github.com/anacrolix/torrent/issues/83. If we get
+			// an endless stream of errors (such as the PacketConn being
+			// Closed outside of our control, this work around may need to be
+			// reconsidered.
+			log.Print(err)
+			continue
 		}
 		sa, sal := netAddrToLibSockaddr(addr)
 		atomic.AddInt64(&reads, 1)
