@@ -92,6 +92,9 @@ func (c *Conn) close() {
 func (c *Conn) LocalAddr() net.Addr {
 	mu.Lock()
 	defer mu.Unlock()
+	if c.s == nil {
+		return nil
+	}
 	return getSocketForLibContext(C.utp_get_context(c.s)).pc.LocalAddr()
 }
 
@@ -194,6 +197,9 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 func (c *Conn) RemoteAddr() net.Addr {
 	var rsa syscall.RawSockaddrAny
 	var addrlen C.socklen_t = C.socklen_t(unsafe.Sizeof(rsa))
+	if c.s == nil {
+		return nil
+	}
 	C.utp_getpeername(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
 	sa, err := anyToSockaddr(&rsa)
 	if err != nil {
