@@ -69,7 +69,7 @@ func (c *Conn) waitForConnect(ctx context.Context) error {
 	}
 }
 
-func (c *Conn) Close() (err error) {
+func (c *Conn) Close() error {
 	mu.Lock()
 	defer mu.Unlock()
 	c.close()

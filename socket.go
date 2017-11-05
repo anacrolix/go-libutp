@@ -28,6 +28,7 @@ type Socket struct {
 
 var (
 	_ net.PacketConn = (*Socket)(nil)
+	_ net.Listener   = (*Socket)(nil)
 )
 
 type packet struct {
