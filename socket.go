@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/anacrolix/mmsg"
+
 	"github.com/anacrolix/missinggo/inproc"
 )
 
@@ -88,51 +90,95 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	return c
 }
 
-var reads int64
-
 func (s *Socket) packetReader() {
-	var b [0x1000]byte
+	mc := mmsg.NewConn(s.pc)
+	// Increasing the messages increases the memory use, but also means we can
+	// reduces utp_issue_deferred_acks and syscalls which should improve
+	// efficiency. On the flip side, not all OSs implement batched reads.
+	ms := make([]mmsg.Message, func() int {
+		if mc.Err() == nil {
+			return 16
+		} else {
+			return 1
+		}
+	}())
+	for i := range ms {
+		// This buffer size is just made up, but it's a trade off between how
+		// much of the MTU (usually about 1500?) will be utilized and memory-
+		// use.
+		ms[i].Buffers = [][]byte{make([]byte, 0x1000)}
+	}
+	// Some crap OSs like Windoze will raise errors in Reads that don't
+	// actually mean we should stop.
+	consecutiveErrors := 0
 	for {
 		// In C, all the reads are processed and when it threatens to block,
-		// we're supposed to call utp_issue_deferred_acks. I don't know how we
-		// can do this in Go. An mrecv or non-blocking form of ReadFrom is
-		// required.
-		n, addr, err := s.pc.ReadFrom(b[:])
+		// we're supposed to call utp_issue_deferred_acks.
+		n, err := mc.RecvMsgs(ms)
+		log.Print(n)
+		if n == 1 {
+			singleMsgRecvs.Add(1)
+		}
+		if n > 1 {
+			multiMsgRecvs.Add(1)
+		}
 		if err != nil {
 			mu.Lock()
 			closed := s.closed
 			mu.Unlock()
 			if closed {
+				// We don't care.
 				return
 			}
 			// See https://github.com/anacrolix/torrent/issues/83. If we get
 			// an endless stream of errors (such as the PacketConn being
 			// Closed outside of our control, this work around may need to be
 			// reconsidered.
-			log.Print(err)
+			Logger.Printf("ignoring socket read error: %s", err)
+			consecutiveErrors++
+			if consecutiveErrors >= 100 {
+				Logger.Print("too many consecutive errors, closing socket")
+				s.Close()
+				return
+			}
 			continue
 		}
-		sa, sal := netAddrToLibSockaddr(addr)
-		atomic.AddInt64(&reads, 1)
-		// log.Printf("received %d bytes, %d packets", n, reads)
+		consecutiveErrors = 0
 		func() {
 			mu.Lock()
 			defer mu.Unlock()
 			if s.closed {
 				return
 			}
-			ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(n), sa, sal)
-			switch ret {
-			case 1:
-				socketUtpPacketsReceived.Add(1)
+			gotUtp := false
+			for _, m := range ms[:n] {
+				gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
+			}
+			if gotUtp {
 				C.utp_issue_deferred_acks(s.ctx)
+				// TODO: When is this done in C?
 				C.utp_check_timeouts(s.ctx)
-			case 0:
-				s.onReadNonUtp(b[:n], addr)
-			default:
-				panic(ret)
 			}
 		}()
+	}
+}
+
+var reads int64
+
+func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
+	sa, sal := netAddrToLibSockaddr(addr)
+	atomic.AddInt64(&reads, 1)
+	// log.Printf("received %d bytes, %d packets", n, reads)
+	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
+	switch ret {
+	case 1:
+		socketUtpPacketsReceived.Add(1)
+		return true
+	case 0:
+		s.onReadNonUtp(b, addr)
+		return false
+	default:
+		panic(ret)
 	}
 }
 
