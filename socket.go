@@ -7,7 +7,6 @@ import "C"
 import (
 	"context"
 	"errors"
-	"log"
 	"net"
 	"sync/atomic"
 	"time"
@@ -115,7 +114,6 @@ func (s *Socket) packetReader() {
 		// In C, all the reads are processed and when it threatens to block,
 		// we're supposed to call utp_issue_deferred_acks.
 		n, err := mc.RecvMsgs(ms)
-		log.Print(n)
 		if n == 1 {
 			singleMsgRecvs.Add(1)
 		}
