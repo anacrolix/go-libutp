@@ -10,6 +10,7 @@ install:
   - go get github.com/anacrolix/envpprof
   - go get github.com/anacrolix/tagflag
   - go get github.com/stretchr/testify/assert
+  - go get github.com/anacrolix/mmsg
 
 build_script:
   - go build -v -x -a
