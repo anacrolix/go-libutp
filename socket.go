@@ -11,9 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anacrolix/mmsg"
-
 	"github.com/anacrolix/missinggo/inproc"
+	"github.com/anacrolix/mmsg"
 )
 
 type Socket struct {
