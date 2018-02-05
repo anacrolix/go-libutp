@@ -338,3 +338,9 @@ func (s *Socket) SetWriteBufferLen(len int) {
 		panic(i)
 	}
 }
+
+func (s *Socket) SetOption(opt Option, val int) int {
+	mu.Lock()
+	defer mu.Unlock()
+	return int(C.utp_context_set_option(s.ctx, opt, C.int(val)))
+}

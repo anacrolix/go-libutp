@@ -35,8 +35,8 @@ func (ctx *C.utp_context) setCallbacks() {
 	C.utp_set_callback(ctx, C.UTP_GET_READ_BUFFER_SIZE, (*C.utp_callback_t)(C.getReadBufferSizeCallback))
 }
 
-func (ctx *C.utp_context) setOption(opt, val int) int {
-	return int(C.utp_context_set_option(ctx, C.int(opt), C.int(val)))
+func (ctx *C.utp_context) setOption(opt Option, val int) int {
+	return int(C.utp_context_set_option(ctx, opt, C.int(val)))
 }
 
 func libStateName(state C.int) string {
