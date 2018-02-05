@@ -101,10 +101,12 @@ func (s *Socket) packetReader() {
 		}
 	}())
 	for i := range ms {
-		// This buffer size is just made up, but it's a trade off between how
-		// much of the MTU (usually about 1500?) will be utilized and memory-
-		// use.
-		ms[i].Buffers = [][]byte{make([]byte, 0x1000)}
+		// The IPv4 UDP limit is allegedly about 64 KiB, and this message has
+		// been seen on receiving on Windows with just 0x1000: wsarecvfrom: A
+		// message sent on a datagram socket was larger than the internal
+		// message buffer or some other network limit, or the buffer used to
+		// receive a datagram into was smaller than the datagram itself.
+		ms[i].Buffers = [][]byte{make([]byte, 0x10000)}
 	}
 	// Some crap OSs like Windoze will raise errors in Reads that don't
 	// actually mean we should stop.
