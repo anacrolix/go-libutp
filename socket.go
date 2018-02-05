@@ -195,29 +195,29 @@ func (s *Socket) timeoutChecker() {
 	}
 }
 
-func (me *Socket) Close() error {
+func (s *Socket) Close() error {
 	mu.Lock()
 	defer mu.Unlock()
-	if me.closed {
+	if s.closed {
 		return nil
 	}
 	// Calling this deletes the pointer. It must not be referred to after
 	// this.
-	C.utp_destroy(me.ctx)
-	me.ctx = nil
-	me.pc.Close()
-	close(me.backlog)
-	close(me.nonUtpReads)
-	me.closed = true
+	C.utp_destroy(s.ctx)
+	s.ctx = nil
+	s.pc.Close()
+	close(s.backlog)
+	close(s.nonUtpReads)
+	s.closed = true
 	return nil
 }
 
-func (me *Socket) Addr() net.Addr {
-	return me.pc.LocalAddr()
+func (s *Socket) Addr() net.Addr {
+	return s.pc.LocalAddr()
 }
 
-func (me *Socket) LocalAddr() net.Addr {
-	return me.pc.LocalAddr()
+func (s *Socket) LocalAddr() net.Addr {
+	return s.pc.LocalAddr()
 }
 
 func (s *Socket) Accept() (net.Conn, error) {
