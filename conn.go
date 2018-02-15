@@ -36,6 +36,9 @@ type Conn struct {
 
 	numBytesRead    int64
 	numBytesWritten int64
+
+	localAddr  net.Addr
+	remoteAddr net.Addr
 }
 
 func (c *Conn) onLibError(codeName string) {
@@ -90,12 +93,7 @@ func (c *Conn) close() {
 }
 
 func (c *Conn) LocalAddr() net.Addr {
-	mu.Lock()
-	defer mu.Unlock()
-	if c.s == nil {
-		return nil
-	}
-	return getSocketForLibContext(C.utp_get_context(c.s)).pc.LocalAddr()
+	return c.localAddr
 }
 
 func (c *Conn) readNoWait(b []byte) (n int, err error) {
@@ -194,18 +192,19 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	return
 }
 
-func (c *Conn) RemoteAddr() net.Addr {
+func (c *Conn) setRemoteAddr() {
 	var rsa syscall.RawSockaddrAny
 	var addrlen C.socklen_t = C.socklen_t(unsafe.Sizeof(rsa))
-	if c.s == nil {
-		return nil
-	}
 	C.utp_getpeername(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
 	sa, err := anyToSockaddr(&rsa)
 	if err != nil {
 		panic(err)
 	}
-	return sockaddrToUDP(sa)
+	c.remoteAddr = sockaddrToUDP(sa)
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.remoteAddr
 }
 
 func (c *Conn) SetDeadline(t time.Time) error {

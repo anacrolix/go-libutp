@@ -79,7 +79,8 @@ func (s *Socket) onLibSocketDestroyed(ls *C.utp_socket) {
 
 func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	c := &Conn{
-		s: us,
+		s:         us,
+		localAddr: s.pc.LocalAddr(),
 	}
 	c.cond.L = &mu
 	s.conns[us] = c
@@ -265,6 +266,7 @@ func (s *Socket) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	}
 	c := s.newConn(C.utp_create_socket(s.ctx))
 	C.utp_connect(c.s, sa, sl)
+	c.setRemoteAddr()
 	err = c.waitForConnect(ctx)
 	if err != nil {
 		c.close()
