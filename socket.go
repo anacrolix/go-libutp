@@ -7,6 +7,7 @@ import "C"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -237,11 +238,13 @@ func (s *Socket) DialTimeout(addr string, timeout time.Duration) (net.Conn, erro
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	return s.DialContext(ctx, addr)
+	return s.DialContext(ctx, "", addr)
 }
 
-func (s *Socket) resolveAddr(addr string) (net.Addr, error) {
-	n := s.Addr().Network()
+func (s *Socket) resolveAddr(n, addr string) (net.Addr, error) {
+	if n == "" {
+		n = s.Addr().Network()
+	}
 	switch n {
 	case "inproc":
 		return inproc.ResolveAddr(n, addr)
@@ -250,10 +253,11 @@ func (s *Socket) resolveAddr(addr string) (net.Addr, error) {
 	}
 }
 
-func (s *Socket) DialContext(ctx context.Context, addr string) (net.Conn, error) {
-	ua, err := s.resolveAddr(addr)
+// Passing an empty network will use the network of the Socket's listener.
+func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	ua, err := s.resolveAddr(network, addr)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error resolving address: %v", err)
 	}
 	sa, sl := netAddrToLibSockaddr(ua)
 	mu.Lock()
