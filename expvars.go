@@ -5,6 +5,7 @@ import (
 )
 
 var (
+	expMap                      = expvar.NewMap("go-libutp")
 	socketUtpPacketsReceived    = expvar.NewInt("utpSocketUtpPacketsReceived")
 	socketNonUtpPacketsReceived = expvar.NewInt("utpSocketNonUtpPacketsReceived")
 	nonUtpPacketsDropped        = expvar.NewInt("utpNonUtpPacketsDropped")

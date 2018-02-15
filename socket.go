@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/anacrolix/missinggo/inproc"
@@ -144,6 +143,8 @@ func (s *Socket) packetReader() {
 			continue
 		}
 		consecutiveErrors = 0
+		expMap.Add("successful mmsg receive calls", 1)
+		expMap.Add("received messages", int64(n))
 		func() {
 			mu.Lock()
 			defer mu.Unlock()
@@ -163,12 +164,8 @@ func (s *Socket) packetReader() {
 	}
 }
 
-var reads int64
-
 func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
 	sa, sal := netAddrToLibSockaddr(addr)
-	atomic.AddInt64(&reads, 1)
-	// log.Printf("received %d bytes, %d packets", n, reads)
 	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
 	switch ret {
 	case 1:
