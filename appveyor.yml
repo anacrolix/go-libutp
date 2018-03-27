@@ -11,6 +11,7 @@ install:
   - go get github.com/anacrolix/tagflag
   - go get github.com/stretchr/testify/assert
   - go get github.com/anacrolix/mmsg
+  - go get golang.org/x/net/nettest
 
 build_script:
   - go build -v -x -a
