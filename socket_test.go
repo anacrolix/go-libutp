@@ -16,3 +16,10 @@ func TestUseClosedSocket(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
+
+func TestSocketNetwork(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	assert.Equal(t, "udp", s.Addr().Network())
+}
