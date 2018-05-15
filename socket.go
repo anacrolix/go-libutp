@@ -164,16 +164,30 @@ func (s *Socket) packetReader() {
 		}()
 	}
 }
-
 func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
+	if s.utpProcessUdp(b, addr) {
+		socketUtpPacketsReceived.Add(1)
+		return true
+	} else {
+		s.onReadNonUtp(b, addr)
+		return false
+	}
+}
+
+// Wraps libutp's utp_process_udp, returning relevant information.
+func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 	sa, sal := netAddrToLibSockaddr(addr)
+	if len(b) == 0 {
+		// The implementation of utp_process_udp rejects null buffers, and
+		// anything smaller than the UTP header size. It's also prone to
+		// assert on those, which we don't want to trigger.
+		return false
+	}
 	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
 	switch ret {
 	case 1:
-		socketUtpPacketsReceived.Add(1)
 		return true
 	case 0:
-		s.onReadNonUtp(b, addr)
 		return false
 	default:
 		panic(ret)
