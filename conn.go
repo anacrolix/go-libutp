@@ -26,8 +26,9 @@ type Conn struct {
 	// socket after getting this.
 	destroyed bool
 	// Conn.Close was called.
-	closed   bool
-	libError error
+	closed bool
+
+	err error
 
 	writeDeadline      time.Time
 	writeDeadlineTimer *time.Timer
@@ -41,8 +42,8 @@ type Conn struct {
 	remoteAddr net.Addr
 }
 
-func (c *Conn) onLibError(codeName string) {
-	c.libError = errors.New(codeName)
+func (c *Conn) onError(err error) {
+	c.err = err
 	c.cond.Broadcast()
 }
 
@@ -59,8 +60,8 @@ func (c *Conn) waitForConnect(ctx context.Context) error {
 		c.cond.Broadcast()
 	}()
 	for {
-		if c.libError != nil {
-			return c.libError
+		if c.err != nil {
+			return c.err
 		}
 		if c.gotConnect {
 			return nil
@@ -112,8 +113,8 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 		switch {
 		case c.gotEOF:
 			return io.EOF
-		case c.libError != nil:
-			return c.libError
+		case c.err != nil:
+			return c.err
 		case c.destroyed:
 			return errors.New("destroyed")
 		case c.closed:
@@ -145,8 +146,8 @@ func (c *Conn) Read(b []byte) (int, error) {
 func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	err = func() error {
 		switch {
-		case c.libError != nil:
-			return c.libError
+		case c.err != nil:
+			return c.err
 		case c.closed:
 			return errors.New("closed")
 		case c.destroyed:

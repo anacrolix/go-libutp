@@ -5,6 +5,8 @@ package utp
 */
 import "C"
 import (
+	"errors"
+	"fmt"
 	"log"
 	"reflect"
 	"sync/atomic"
@@ -35,9 +37,10 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	if logCallbacks {
 		Logger.Printf("sending %d bytes, %d packets", len(b), sends)
 	}
+	conn := s.conns[a.socket]
 	n, err := s.pc.WriteTo(b, addr)
 	if err != nil {
-		Logger.Printf("error sending packet: %s", err)
+		conn.onError(fmt.Errorf("error sending packet: %s", err))
 		return
 	}
 	if n != len(b) {
@@ -52,7 +55,7 @@ func errorCallback(a *C.utp_callback_arguments) C.uint64 {
 	if logCallbacks {
 		log.Printf("error callback: socket %p: %s", a.socket, codeName)
 	}
-	libContextToSocket[a.context].conns[a.socket].onLibError(codeName)
+	libContextToSocket[a.context].conns[a.socket].onError(errors.New(codeName))
 	return 0
 }
 
