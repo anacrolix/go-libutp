@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"sync/atomic"
 	"unsafe"
@@ -33,17 +34,24 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
 	addr := structSockaddrToUDPAddr(sa)
-	atomic.AddInt64(&sends, 1)
+	newSends := atomic.AddInt64(&sends, 1)
 	if logCallbacks {
-		Logger.Printf("sending %d bytes, %d packets", len(b), sends)
+		Logger.Printf("sending %d bytes, %d packets", len(b), newSends)
 	}
-	conn := s.conns[a.socket]
+	expMap.Add("socket PacketConn writes", 1)
 	n, err := s.pc.WriteTo(b, addr)
+	c := s.conns[a.socket]
 	if err != nil {
-		conn.onError(fmt.Errorf("error sending packet: %s", err))
+		expMap.Add("socket PacketConn write errors", 1)
+		if err == os.ErrInvalid && c != nil {
+			c.onError(fmt.Errorf("error sending packet: %s", err))
+		} else {
+			Logger.Printf("error sending packet: %#v", err)
+		}
 		return
 	}
 	if n != len(b) {
+		expMap.Add("socket PacketConn short writes", 1)
 		Logger.Printf("expected to send %d bytes but only sent %d", len(b), n)
 	}
 	return
