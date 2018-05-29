@@ -146,24 +146,31 @@ func (s *Socket) packetReader() {
 		consecutiveErrors = 0
 		expMap.Add("successful mmsg receive calls", 1)
 		expMap.Add("received messages", int64(n))
-		func() {
-			mu.Lock()
-			defer mu.Unlock()
-			if s.closed {
-				return
-			}
-			gotUtp := false
-			for _, m := range ms[:n] {
-				gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
-			}
-			if gotUtp {
-				C.utp_issue_deferred_acks(s.ctx)
-				// TODO: When is this done in C?
-				C.utp_check_timeouts(s.ctx)
-			}
-		}()
+		s.processReceivedMessages(ms[:n])
 	}
 }
+
+func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
+	mu.Lock()
+	defer mu.Unlock()
+	if s.closed {
+		return
+	}
+	gotUtp := false
+	for _, m := range ms {
+		gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
+	}
+	if gotUtp {
+		s.afterReceivingUtpMessages()
+	}
+}
+
+func (s *Socket) afterReceivingUtpMessages() {
+	C.utp_issue_deferred_acks(s.ctx)
+	// TODO: When is this done in C?
+	C.utp_check_timeouts(s.ctx)
+}
+
 func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
 	if s.utpProcessUdp(b, addr) {
 		socketUtpPacketsReceived.Add(1)
