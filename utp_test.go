@@ -1,6 +1,7 @@
 package utp
 
 import (
+	"context"
 	"log"
 	"math/rand"
 	"net"
@@ -134,4 +135,21 @@ func TestConnSendBuffer(t *testing.T) {
 		}
 	}
 	t.Logf("write buffered %d bytes", written)
+}
+
+func TestCanHandleConnectWriteErrors(t *testing.T) {
+	s, err := NewSocket("udp", ":0")
+	require.NoError(t, err)
+	defer s.Close()
+	c, err := s.NewConn()
+	require.NoError(t, err)
+	gotError := false
+	c.OnError(func(err error) {
+		gotError = true
+		log.Printf("notified of error: %s", err)
+		c.Close()
+	})
+	err = c.Connect(context.Background(), "", "localhost:0")
+	assert.Equal(t, ErrConnClosed, err)
+	assert.True(t, gotError)
 }

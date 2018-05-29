@@ -7,7 +7,6 @@ import "C"
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"time"
 
@@ -262,39 +261,43 @@ func (s *Socket) DialTimeout(addr string, timeout time.Duration) (net.Conn, erro
 	return s.DialContext(ctx, "", addr)
 }
 
-func (s *Socket) resolveAddr(n, addr string) (net.Addr, error) {
-	if n == "" {
-		n = s.Addr().Network()
+func (s *Socket) resolveAddr(network, addr string) (net.Addr, error) {
+	if network == "" {
+		network = s.Addr().Network()
 	}
-	switch n {
+	return resolveAddr(network, addr)
+}
+
+func resolveAddr(network, addr string) (net.Addr, error) {
+	switch network {
 	case "inproc":
-		return inproc.ResolveAddr(n, addr)
+		return inproc.ResolveAddr(network, addr)
 	default:
-		return net.ResolveUDPAddr(n, addr)
+		return net.ResolveUDPAddr(network, addr)
 	}
 }
 
 // Passing an empty network will use the network of the Socket's listener.
 func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	ua, err := s.resolveAddr(network, addr)
+	c, err := s.NewConn()
 	if err != nil {
-		return nil, fmt.Errorf("error resolving address: %v", err)
+		return nil, err
 	}
-	sa, sl := netAddrToLibSockaddr(ua)
+	err = c.Connect(ctx, network, addr)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *Socket) NewConn() (*Conn, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	if s.closed {
 		return nil, errors.New("socket closed")
 	}
-	c := s.newConn(C.utp_create_socket(s.ctx))
-	C.utp_connect(c.s, sa, sl)
-	c.setRemoteAddr()
-	err = c.waitForConnect(ctx)
-	if err != nil {
-		c.close()
-		return nil, err
-	}
-	return c, nil
+	return s.newConn(C.utp_create_socket(s.ctx)), nil
 }
 
 func (s *Socket) pushBacklog(c *Conn) {

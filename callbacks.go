@@ -6,9 +6,7 @@ package utp
 import "C"
 import (
 	"errors"
-	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"sync/atomic"
 	"unsafe"
@@ -43,8 +41,8 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	c := s.conns[a.socket]
 	if err != nil {
 		expMap.Add("socket PacketConn write errors", 1)
-		if err == os.ErrInvalid && c != nil {
-			c.onError(fmt.Errorf("error sending packet: %s", err))
+		if c != nil && c.userOnError != nil {
+			go c.userOnError(err)
 		} else {
 			Logger.Printf("error sending packet: %#v", err)
 		}
@@ -125,6 +123,7 @@ func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 	s := getSocketForLibContext(a.context)
 	c := s.newConn(a.socket)
 	c.setRemoteAddr()
+	c.inited = true
 	s.pushBacklog(c)
 	return 0
 }
