@@ -5,7 +5,6 @@ package utp
 */
 import "C"
 import (
-	"errors"
 	"log"
 	"reflect"
 	"sync/atomic"
@@ -57,11 +56,11 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 
 //export errorCallback
 func errorCallback(a *C.utp_callback_arguments) C.uint64 {
-	codeName := libErrorCodeNames(a.error_code())
+	err := errorForCode(a.error_code())
 	if logCallbacks {
-		log.Printf("error callback: socket %p: %s", a.socket, codeName)
+		log.Printf("error callback: socket %p: %s", a.socket, err)
 	}
-	libContextToSocket[a.context].conns[a.socket].onError(errors.New(codeName))
+	libContextToSocket[a.context].conns[a.socket].onError(err)
 	return 0
 }
 
