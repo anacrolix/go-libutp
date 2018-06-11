@@ -43,7 +43,7 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 		if c != nil && c.userOnError != nil {
 			go c.userOnError(err)
 		} else {
-			Logger.Printf("error sending packet: %#v", err)
+			Logger.Printf("error sending packet: %s", err)
 		}
 		return
 	}
