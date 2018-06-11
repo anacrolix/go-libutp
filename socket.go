@@ -14,7 +14,8 @@ struct utp_process_udp_args {
 void process_received_messages(utp_context *ctx, struct utp_process_udp_args *args, size_t argslen)
 {
 	bool gotUtp = false;
-	for (size_t i = 0; i < argslen; i++) {
+	size_t i;
+	for (i = 0; i < argslen; i++) {
 		struct utp_process_udp_args *a = &args[i];
 		//if (!a->len) continue;
 		if (utp_process_udp(ctx, a->buf, a->len, a->sa, a->sal)) {
