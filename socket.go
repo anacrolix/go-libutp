@@ -2,6 +2,30 @@ package utp
 
 /*
 #include "utp.h"
+#include <stdbool.h>
+
+struct utp_process_udp_args {
+	const byte *buf;
+	size_t len;
+	const struct sockaddr *sa;
+	socklen_t sal;
+};
+
+void process_received_messages(utp_context *ctx, struct utp_process_udp_args *args, size_t argslen)
+{
+	bool gotUtp = false;
+	for (size_t i = 0; i < argslen; i++) {
+		struct utp_process_udp_args *a = &args[i];
+		//if (!a->len) continue;
+		if (utp_process_udp(ctx, a->buf, a->len, a->sa, a->sal)) {
+			gotUtp = true;
+		}
+	}
+	if (gotUtp) {
+		utp_issue_deferred_acks(ctx);
+		utp_check_timeouts(ctx);
+	}
+}
 */
 import "C"
 import (
@@ -88,6 +112,8 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	return c
 }
 
+const maxNumBuffers = 16
+
 func (s *Socket) packetReader() {
 	mc := mmsg.NewConn(s.pc)
 	// Increasing the messages increases the memory use, but also means we can
@@ -95,7 +121,7 @@ func (s *Socket) packetReader() {
 	// efficiency. On the flip side, not all OSs implement batched reads.
 	ms := make([]mmsg.Message, func() int {
 		if mc.Err() == nil {
-			return 16
+			return maxNumBuffers
 		} else {
 			return 1
 		}
@@ -155,12 +181,23 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 	if s.closed {
 		return
 	}
-	gotUtp := false
-	for _, m := range ms {
-		gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
-	}
-	if gotUtp {
-		s.afterReceivingUtpMessages()
+	if processPacketsInC {
+		var args [maxNumBuffers]C.struct_utp_process_udp_args
+		for i, m := range ms {
+			a := &args[i]
+			a.buf = (*C.byte)(&m.Buffers[0][0])
+			a.len = C.size_t(m.N)
+			a.sa, a.sal = netAddrToLibSockaddr(m.Addr)
+		}
+		C.process_received_messages(s.ctx, &args[0], C.size_t(len(ms)))
+	} else {
+		gotUtp := false
+		for _, m := range ms {
+			gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
+		}
+		if gotUtp {
+			s.afterReceivingUtpMessages()
+		}
 	}
 }
 
@@ -179,6 +216,10 @@ func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
 		return false
 	}
 }
+
+// Process packet batches entirely from C, reducing CGO overhead. Currently
+// requires GODEBUG=cgocheck=0.
+const processPacketsInC = false
 
 // Wraps libutp's utp_process_udp, returning relevant information.
 func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
