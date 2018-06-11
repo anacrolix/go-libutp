@@ -12,7 +12,11 @@ import (
 )
 
 func (a *C.utp_callback_arguments) bufBytes() []byte {
-	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{uintptr(unsafe.Pointer(a.buf)), int(a.len), int(a.len)}))
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		uintptr(unsafe.Pointer(a.buf)),
+		int(a.len),
+		int(a.len),
+	}))
 }
 
 func (a *C.utp_callback_arguments) state() C.int {
