@@ -17,7 +17,10 @@ import (
 	"unsafe"
 )
 
-var ErrConnClosed = errors.New("closed")
+var (
+	ErrConnClosed    = errors.New("closed")
+	errConnDestroyed = errors.New("destroyed")
+)
 
 type Conn struct {
 	s          *C.utp_socket
@@ -129,7 +132,7 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 		case c.err != nil:
 			return c.err
 		case c.destroyed:
-			return errors.New("destroyed")
+			return errConnDestroyed
 		case c.closed:
 			return errors.New("closed")
 		case !c.readDeadline.IsZero() && !time.Now().Before(c.readDeadline):
@@ -164,7 +167,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 		case c.closed:
 			return errors.New("closed")
 		case c.destroyed:
-			return errors.New("destroyed")
+			return errConnDestroyed
 		case !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline):
 			return errDeadlineExceeded{}
 		default:
@@ -302,6 +305,9 @@ func (c *Conn) Connect(ctx context.Context, network, addr string) error {
 	sa, sl := netAddrToLibSockaddr(ua)
 	mu.Lock()
 	defer mu.Unlock()
+	if c.destroyed {
+		return errConnDestroyed
+	}
 	if n := C.utp_connect(c.s, sa, sl); n != 0 {
 		panic(n)
 	}
