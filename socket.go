@@ -51,8 +51,9 @@ type Socket struct {
 }
 
 var (
-	_ net.PacketConn = (*Socket)(nil)
-	_ net.Listener   = (*Socket)(nil)
+	_               net.PacketConn = (*Socket)(nil)
+	_               net.Listener   = (*Socket)(nil)
+	errSocketClosed                = errors.New("Socket closed")
 )
 
 type packet struct {
@@ -103,7 +104,8 @@ func (s *Socket) onLibSocketDestroyed(ls *C.utp_socket) {
 
 func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	c := &Conn{
-		s:         us,
+		s:         s,
+		us:        us,
 		localAddr: s.pc.LocalAddr(),
 	}
 	c.cond.L = &mu

@@ -19,7 +19,7 @@ func TestConnMethodsAfterClose(t *testing.T) {
 	for _, c := range []net.Conn{d, a} {
 		// We're trying to test what happens when the Conn isn't known to
 		// libutp anymore.
-		assert.Nil(t, c.(*Conn).s)
+		assert.Nil(t, c.(*Conn).us)
 		// These functions must not panic. I'm not sure we care what they
 		// return.
 		assert.NotPanics(t, func() { c.RemoteAddr() })

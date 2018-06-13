@@ -23,7 +23,8 @@ var (
 )
 
 type Conn struct {
-	s          *C.utp_socket
+	s          *Socket
+	us         *C.utp_socket
 	cond       sync.Cond
 	readBuf    bytes.Buffer
 	gotEOF     bool
@@ -97,13 +98,12 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) close() {
-	// log.Printf("conn %p: closed", c)
-	if c.closed {
-		return
+	if c.inited && !c.destroyed && !c.closed {
+		C.utp_close(c.us)
 	}
-	if c.inited && !c.destroyed {
-		C.utp_close(c.s)
-		// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
+	if !c.inited {
+		// We'll never receive a destroy message, so we should remove it now.
+		delete(c.s.conns, c.us)
 	}
 	c.closed = true
 	c.cond.Broadcast()
@@ -117,8 +117,8 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 	n, _ = c.readBuf.Read(b)
 	if n != 0 && c.readBuf.Len() == 0 {
 		// Can we call this if the utp_socket is closed, destroyed or errored?
-		if c.s != nil {
-			C.utp_read_drained(c.s)
+		if c.us != nil {
+			C.utp_read_drained(c.us)
 			// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 		}
 	}
@@ -177,7 +177,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	n = int(C.utp_write(c.s, unsafe.Pointer(&b[0]), C.size_t(len(b))))
+	n = int(C.utp_write(c.us, unsafe.Pointer(&b[0]), C.size_t(len(b))))
 	if n < 0 {
 		panic(n)
 	}
@@ -212,7 +212,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 func (c *Conn) setRemoteAddr() {
 	var rsa syscall.RawSockaddrAny
 	var addrlen C.socklen_t = C.socklen_t(unsafe.Sizeof(rsa))
-	C.utp_getpeername(c.s, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
+	C.utp_getpeername(c.us, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
 	sa, err := anyToSockaddr(&rsa)
 	if err != nil {
 		panic(err)
@@ -274,20 +274,20 @@ func (c *Conn) setGotEOF() {
 
 func (c *Conn) onDestroyed() {
 	c.destroyed = true
-	c.s = nil
+	c.us = nil
 	c.cond.Broadcast()
 }
 
 func (c *Conn) WriteBufferLen() int {
 	mu.Lock()
 	defer mu.Unlock()
-	return int(C.utp_getsockopt(c.s, C.UTP_SNDBUF))
+	return int(C.utp_getsockopt(c.us, C.UTP_SNDBUF))
 }
 
 func (c *Conn) SetWriteBufferLen(len int) {
 	mu.Lock()
 	defer mu.Unlock()
-	i := C.utp_setsockopt(c.s, C.UTP_SNDBUF, C.int(len))
+	i := C.utp_setsockopt(c.us, C.UTP_SNDBUF, C.int(len))
 	if i != 0 {
 		panic(i)
 	}
@@ -305,10 +305,10 @@ func (c *Conn) Connect(ctx context.Context, network, addr string) error {
 	sa, sl := netAddrToLibSockaddr(ua)
 	mu.Lock()
 	defer mu.Unlock()
-	if c.destroyed {
-		return errConnDestroyed
+	if c.s.closed {
+		return errSocketClosed
 	}
-	if n := C.utp_connect(c.s, sa, sl); n != 0 {
+	if n := C.utp_connect(c.us, sa, sl); n != 0 {
 		panic(n)
 	}
 	c.inited = true

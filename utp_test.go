@@ -160,3 +160,30 @@ func TestCanHandleConnectWriteErrors(t *testing.T) {
 		}
 	}(), err)
 }
+
+func TestConnectConnAfterSocketClose(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	c, err := s.NewConn()
+	require.NoError(t, err)
+	defer c.Close()
+	s.Close()
+	assert.Equal(t, errSocketClosed, c.Connect(context.Background(), "", ""))
+}
+
+func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
+	mu.Lock()
+	assert.Len(t, s.conns, l)
+	mu.Unlock()
+}
+
+func TestSocketConnsAfterConnClosed(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	c, err := s.NewConn()
+	require.NoError(t, err)
+	c.Close()
+	assertSocketConnsLen(t, s, 0)
+}
