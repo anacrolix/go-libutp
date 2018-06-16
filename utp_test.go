@@ -19,9 +19,9 @@ func init() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 }
 
-func doNettestTestConn(t *testing.T, swapConns bool) {
+func doNettestTestConn(t *testing.T, swapConns bool, host string) {
 	nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-		s, err := NewSocket("inproc", "localhost:0")
+		s, err := NewSocket("inproc", net.JoinHostPort(host, "0"))
 		if err != nil {
 			return
 		}
@@ -38,12 +38,22 @@ func doNettestTestConn(t *testing.T, swapConns bool) {
 
 func TestNettestTestConn(t *testing.T) {
 	t.Parallel()
-	doNettestTestConn(t, false)
+	doNettestTestConn(t, false, "127.0.0.1")
+}
+
+func TestNettestTestConnIp6(t *testing.T) {
+	t.Parallel()
+	doNettestTestConn(t, false, "::1")
 }
 
 func TestNettestTestConnSwapped(t *testing.T) {
 	t.Parallel()
-	doNettestTestConn(t, true)
+	doNettestTestConn(t, true, "127.0.0.1")
+}
+
+func TestNettestTestConnSwappedIp6(t *testing.T) {
+	t.Parallel()
+	doNettestTestConn(t, true, "::1")
 }
 
 var rander = rand.New(rand.NewSource(time.Now().UnixNano()))
