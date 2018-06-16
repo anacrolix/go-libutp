@@ -104,11 +104,13 @@ func TestDialTimeout(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
+	const timeout = time.Second
 	started := time.Now()
-	_, err = s.DialTimeout(neverResponds, time.Second)
-	require.Error(t, err)
-	t.Log(err)
-	assert.True(t, time.Now().Before(started.Add(2*time.Second)))
+	_, err = s.DialTimeout(neverResponds, timeout)
+	timeTaken := time.Since(started)
+	t.Logf("dial returned after %s", timeTaken)
+	assert.Equal(t, context.DeadlineExceeded, err)
+	assert.True(t, timeTaken >= timeout)
 }
 
 func TestConnSendBuffer(t *testing.T) {
@@ -148,7 +150,7 @@ func TestConnSendBuffer(t *testing.T) {
 }
 
 func TestCanHandleConnectWriteErrors(t *testing.T) {
-	s, err := NewSocket("udp", ":0")
+	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
 	c, err := s.NewConn()
