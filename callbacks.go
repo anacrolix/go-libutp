@@ -7,6 +7,7 @@ import "C"
 import (
 	"log"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"unsafe"
 )
@@ -46,6 +47,15 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 		expMap.Add("socket PacketConn write errors", 1)
 		if c != nil && c.userOnError != nil {
 			go c.userOnError(err)
+		} else if c != nil &&
+			(strings.Contains(err.Error(), "can't assign requested address") ||
+				strings.Contains(err.Error(), "invalid argument")) {
+			// Should be an bad argument or network configuration problem we
+			// can't recover from.
+			c.onError(err)
+		} else if c != nil && strings.Contains(err.Error(), "operation not permitted") {
+			// Rate-limited. Probably Linux. The implementation might try
+			// again later.
 		} else {
 			Logger.Printf("error sending packet: %s", err)
 		}
