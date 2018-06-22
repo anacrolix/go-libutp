@@ -199,3 +199,11 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 	c.Close()
 	assertSocketConnsLen(t, s, 0)
 }
+
+func TestConnectZeroPort(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	require.NoError(t, err)
+	defer s.Close()
+	_, err = s.Dial("192.0.2.0:0")
+	assert.Contains(t, err.Error(), "can't assign requested address")
+}
