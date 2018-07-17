@@ -264,6 +264,10 @@ func (s *Socket) timeoutChecker() {
 func (s *Socket) Close() error {
 	mu.Lock()
 	defer mu.Unlock()
+	return s.closeLocked()
+}
+
+func (s *Socket) closeLocked() error {
 	if s.closed {
 		return nil
 	}
