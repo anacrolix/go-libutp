@@ -165,7 +165,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 		case c.err != nil:
 			return c.err
 		case c.closed:
-			return errors.New("closed")
+			return ErrConnClosed
 		case c.destroyed:
 			return errConnDestroyed
 		case !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline):
