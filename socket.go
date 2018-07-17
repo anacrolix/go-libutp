@@ -36,6 +36,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/inproc"
 	"github.com/anacrolix/mmsg"
 )
