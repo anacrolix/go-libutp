@@ -236,6 +236,9 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 		// assert on those, which we don't want to trigger.
 		return false
 	}
+	if missinggo.AddrPort(addr) == 0 {
+		return false
+	}
 	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
 	switch ret {
 	case 1:
