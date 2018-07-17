@@ -181,14 +181,10 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	if n < 0 {
 		panic(n)
 	}
-	// log.Print(n)
-	// C.utp_issue_deferred_acks(C.utp_get_context(c.s))
 	return
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	// defer func() { log.Printf("wrote %d bytes: %s", n, err) }()
-	// log.Print(len(b))
 	mu.Lock()
 	defer mu.Unlock()
 	for len(b) != 0 {
