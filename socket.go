@@ -42,15 +42,18 @@ import (
 )
 
 type Socket struct {
-	pc            net.PacketConn
-	ctx           *C.utp_context
-	backlog       chan *Conn
-	closed        bool
-	conns         map[*C.utp_socket]*Conn
-	nonUtpReads   chan packet
-	writeDeadline time.Time
-	readDeadline  time.Time
+	pc               net.PacketConn
+	ctx              *C.utp_context
+	backlog          chan *Conn
+	closed           bool
+	conns            map[*C.utp_socket]*Conn
+	nonUtpReads      chan packet
+	writeDeadline    time.Time
+	readDeadline     time.Time
+	firewallCallback FirewallCallback
 }
+
+type FirewallCallback func(*net.UDPAddr) bool
 
 var (
 	_               net.PacketConn = (*Socket)(nil)
@@ -425,4 +428,10 @@ func (s *Socket) SetOption(opt Option, val int) int {
 	mu.Lock()
 	defer mu.Unlock()
 	return int(C.utp_context_set_option(s.ctx, opt, C.int(val)))
+}
+
+func (s *Socket) SetFirewallCallback(f FirewallCallback) {
+	mu.Lock()
+	s.firewallCallback = f
+	mu.Unlock()
 }

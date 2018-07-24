@@ -28,14 +28,21 @@ func (a *C.utp_callback_arguments) error_code() C.int {
 	return *(*C.int)(unsafe.Pointer(&a.anon0))
 }
 
+func (a *C.utp_callback_arguments) address() *C.struct_sockaddr {
+	return *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
+}
+
+func (a *C.utp_callback_arguments) addressLen() C.socklen_t {
+	return *(*C.socklen_t)(unsafe.Pointer(&a.anon1[0]))
+}
+
 var sends int64
 
 //export sendtoCallback
 func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	s := getSocketForLibContext(a.context)
-	sa := *(**C.struct_sockaddr)(unsafe.Pointer(&a.anon0[0]))
 	b := a.bufBytes()
-	addr := structSockaddrToUDPAddr(sa)
+	addr := structSockaddrToUDPAddr(a.address())
 	newSends := atomic.AddInt64(&sends, 1)
 	if logCallbacks {
 		Logger.Printf("sending %d bytes, %d packets", len(b), newSends)
@@ -153,4 +160,18 @@ func getReadBufferSizeCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 	}
 	ret = C.uint64(c.readBuf.Len())
 	return
+}
+
+//export firewallCallback
+func firewallCallback(a *C.utp_callback_arguments) C.uint64 {
+	s := getSocketForLibContext(a.context)
+	if s.firewallCallback == nil {
+		return 0
+	}
+	block := s.firewallCallback(structSockaddrToUDPAddr(a.address()))
+	if block {
+		return 1
+	} else {
+		return 0
+	}
 }
