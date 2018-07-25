@@ -51,9 +51,11 @@ type Socket struct {
 	writeDeadline    time.Time
 	readDeadline     time.Time
 	firewallCallback FirewallCallback
+	// Whether the next accept is to be blocked.
+	block bool
 }
 
-type FirewallCallback func(*net.UDPAddr) bool
+type FirewallCallback func(net.Addr) bool
 
 var (
 	_               net.PacketConn = (*Socket)(nil)
@@ -203,7 +205,7 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 		for _, m := range ms {
 			gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
 		}
-		if gotUtp {
+		if gotUtp && !s.closed {
 			s.afterReceivingUtpMessages()
 		}
 	}
@@ -241,6 +243,18 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 		return false
 	}
 	if missinggo.AddrPort(addr) == 0 {
+		return false
+	}
+	mu.Unlock()
+	block := func() bool {
+		if s.firewallCallback == nil {
+			return false
+		}
+		return s.firewallCallback(addr)
+	}()
+	mu.Lock()
+	s.block = block
+	if s.closed {
 		return false
 	}
 	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
@@ -378,6 +392,9 @@ func (s *Socket) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
 }
 
 func (s *Socket) onReadNonUtp(b []byte, from net.Addr) {
+	if s.closed {
+		return
+	}
 	socketNonUtpPacketsReceived.Add(1)
 	select {
 	case s.nonUtpReads <- packet{append([]byte(nil), b...), from}:

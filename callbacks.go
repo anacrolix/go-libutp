@@ -165,11 +165,7 @@ func getReadBufferSizeCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 //export firewallCallback
 func firewallCallback(a *C.utp_callback_arguments) C.uint64 {
 	s := getSocketForLibContext(a.context)
-	if s.firewallCallback == nil {
-		return 0
-	}
-	block := s.firewallCallback(structSockaddrToUDPAddr(a.address()))
-	if block {
+	if s.block {
 		return 1
 	} else {
 		return 0
