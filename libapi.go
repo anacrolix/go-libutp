@@ -6,7 +6,8 @@ package utp
 import "C"
 import (
 	"errors"
-	"sync"
+
+	"github.com/anacrolix/sync"
 )
 
 type Option = C.int
