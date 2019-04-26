@@ -34,6 +34,7 @@ func BenchmarkThroughput(t *testing.B) {
 	defer c2.Close()
 	var n int64 = 100 << 20
 	t.SetBytes(n)
+	t.ReportAllocs()
 	for range iter.N(t.N) {
 		// log.Print(i)
 		doneReading := make(chan struct{})
