@@ -3,7 +3,6 @@ package utp
 import (
 	"context"
 	"log"
-	"math/rand"
 	"net"
 	"sync"
 	"testing"
@@ -55,8 +54,6 @@ func TestNettestTestConnSwappedIp6(t *testing.T) {
 	t.Parallel()
 	doNettestTestConn(t, true, "::1")
 }
-
-var rander = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func connPairSocket(s *Socket) (dialed net.Conn, accepted net.Conn) {
 	var (
