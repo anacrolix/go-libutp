@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -178,9 +177,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	pprof.Do(context.Background(), pprof.Labels("cgo", "utp_write"), func(context.Context) {
-		n = int(C.utp_write(c.us, unsafe.Pointer(&b[0]), C.size_t(len(b))))
-	})
+	n = int(C.utp_write(c.us, unsafe.Pointer(&b[0]), C.size_t(len(b))))
 	if n < 0 {
 		panic(n)
 	}

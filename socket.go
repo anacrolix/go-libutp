@@ -33,7 +33,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"runtime/pprof"
 	"time"
 
 	"github.com/anacrolix/missinggo"
@@ -212,11 +211,9 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 }
 
 func (s *Socket) afterReceivingUtpMessages() {
-	pprof.Do(context.Background(), pprof.Labels("go-libutp", "afterReceivingUtpMessages"), func(context.Context) {
-		C.utp_issue_deferred_acks(s.ctx)
-		// TODO: When is this done in C?
-		C.utp_check_timeouts(s.ctx)
-	})
+	C.utp_issue_deferred_acks(s.ctx)
+	// TODO: When is this done in C?
+	C.utp_check_timeouts(s.ctx)
 }
 
 func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
