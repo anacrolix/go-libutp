@@ -23,6 +23,7 @@ func BenchmarkThroughput(t *testing.B) {
 	accepted := make(chan struct{})
 	go func() {
 		defer close(accepted)
+		var err error
 		c2, err = s2.Accept()
 		require.NoError(t, err)
 	}()
