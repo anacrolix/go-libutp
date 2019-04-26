@@ -50,44 +50,25 @@ func zoneToScopeId(zone string) uint32 {
 	return uint32(ui64)
 }
 
-func structSockaddrToUDPAddr(sa *C.struct_sockaddr) *net.UDPAddr {
-	meh, err := anyToSockaddr((*syscall.RawSockaddrAny)(unsafe.Pointer(sa)))
-	if err != nil {
-		panic(err)
-	}
-	return sockaddrToUDP(meh).(*net.UDPAddr)
+func structSockaddrToUDPAddr(sa *C.struct_sockaddr, udp *net.UDPAddr) error {
+	return anySockaddrToUdp((*syscall.RawSockaddrAny)(unsafe.Pointer(sa)), udp)
 }
 
-func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error) {
-	// log.Printf("anyToSockaddr %#v", rsa)
+func anySockaddrToUdp(rsa *syscall.RawSockaddrAny, udp *net.UDPAddr) error {
 	switch rsa.Addr.Family {
-
 	case syscall.AF_INET:
-		pp := (*syscall.RawSockaddrInet4)(unsafe.Pointer(rsa))
-		sa := new(syscall.SockaddrInet4)
-		// p := (*[2]byte)(unsafe.Pointer(&pp.Port))
-		// sa.Port = int(p[0])<<8 + int(p[1])
-		// I don't know why the port isn't reversed when it comes from utp.
-		sa.Port = int(pp.Port)
-		for i := 0; i < len(sa.Addr); i++ {
-			sa.Addr[i] = pp.Addr[i]
-		}
-		return sa, nil
-
+		sa := (*syscall.RawSockaddrInet4)(unsafe.Pointer(rsa))
+		udp.Port = int(sa.Port)
+		udp.IP = append(udp.IP[:0], sa.Addr[:]...)
+		return nil
 	case syscall.AF_INET6:
-		pp := (*syscall.RawSockaddrInet6)(unsafe.Pointer(rsa))
-		sa := new(syscall.SockaddrInet6)
-		// p := (*[2]byte)(unsafe.Pointer(&pp.Port))
-		// sa.Port = int(p[0])<<8 + int(p[1])
-		// I don't know why the port isn't reversed when it comes from utp.
-		sa.Port = int(pp.Port)
-		sa.ZoneId = pp.Scope_id
-		for i := 0; i < len(sa.Addr); i++ {
-			sa.Addr[i] = pp.Addr[i]
-		}
-		return sa, nil
+		sa := (*syscall.RawSockaddrInet6)(unsafe.Pointer(rsa))
+		udp.Port = int(sa.Port)
+		udp.IP = append(udp.IP[:0], sa.Addr[:]...)
+		return nil
+	default:
+		return syscall.EAFNOSUPPORT
 	}
-	return nil, syscall.EAFNOSUPPORT
 }
 
 func sockaddrToUDP(sa syscall.Sockaddr) net.Addr {

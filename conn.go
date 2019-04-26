@@ -209,11 +209,11 @@ func (c *Conn) setRemoteAddr() {
 	var rsa syscall.RawSockaddrAny
 	var addrlen C.socklen_t = C.socklen_t(unsafe.Sizeof(rsa))
 	C.utp_getpeername(c.us, (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), &addrlen)
-	sa, err := anyToSockaddr(&rsa)
-	if err != nil {
+	var udp net.UDPAddr
+	if err := anySockaddrToUdp(&rsa, &udp); err != nil {
 		panic(err)
 	}
-	c.remoteAddr = sockaddrToUDP(sa)
+	c.remoteAddr = &udp
 }
 
 func (c *Conn) RemoteAddr() net.Addr {
