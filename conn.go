@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	ErrConnClosed    = errors.New("closed")
-	errConnDestroyed = errors.New("destroyed")
+	ErrConnClosed            = errors.New("closed")
+	errConnDestroyed         = errors.New("destroyed")
+	errDeadlineExceededValue = errDeadlineExceeded{}
 )
 
 type Conn struct {
@@ -134,9 +135,9 @@ func (c *Conn) readNoWait(b []byte) (n int, err error) {
 		case c.destroyed:
 			return errConnDestroyed
 		case c.closed:
-			return errors.New("closed")
+			return ErrConnClosed
 		case !c.readDeadline.IsZero() && !time.Now().Before(c.readDeadline):
-			return errDeadlineExceeded{}
+			return errDeadlineExceededValue
 		default:
 			return nil
 		}
@@ -169,7 +170,7 @@ func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 		case c.destroyed:
 			return errConnDestroyed
 		case !c.writeDeadline.IsZero() && !time.Now().Before(c.writeDeadline):
-			return errDeadlineExceeded{}
+			return errDeadlineExceededValue
 		default:
 			return nil
 		}
