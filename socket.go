@@ -43,6 +43,11 @@ import (
 	"github.com/anacrolix/mmsg"
 )
 
+const (
+	utpCheckTimeoutInterval   = 500 * time.Millisecond
+	issueDeferredUtpAcksDelay = 1000 * time.Microsecond
+)
+
 type Socket struct {
 	pc               net.PacketConn
 	ctx              *C.utp_context
@@ -55,6 +60,11 @@ type Socket struct {
 	firewallCallback FirewallCallback
 	// Whether the next accept is to be blocked.
 	block bool
+
+	acksScheduled bool
+	ackTimer      *time.Timer
+
+	utpTimeoutChecker *time.Timer
 }
 
 type FirewallCallback func(net.Addr) bool
@@ -88,6 +98,18 @@ func NewSocket(network, addr string) (*Socket, error) {
 		conns:       make(map[*C.utp_socket]*Conn),
 		nonUtpReads: make(chan packet, 100),
 	}
+	s.ackTimer = time.AfterFunc(-1, s.ackTimerFunc)
+	s.utpTimeoutChecker = time.AfterFunc(utpCheckTimeoutInterval, func() {
+		mu.Lock()
+		ok := s.ctx != nil
+		if ok {
+			s.checkUtpTimeouts()
+		}
+		mu.Unlock()
+		if ok {
+			s.utpTimeoutChecker.Reset(utpCheckTimeoutInterval)
+		}
+	})
 	func() {
 		mu.Lock()
 		defer mu.Unlock()
@@ -218,9 +240,29 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 }
 
 func (s *Socket) afterReceivingUtpMessages() {
+	if s.acksScheduled {
+		return
+	}
+	s.ackTimer.Reset(issueDeferredUtpAcksDelay)
+	s.acksScheduled = true
+}
+
+func (s *Socket) issueDeferredAcks() {
 	C.utp_issue_deferred_acks(s.ctx)
-	// TODO: When is this done in C?
+}
+
+func (s *Socket) checkUtpTimeouts() {
 	C.utp_check_timeouts(s.ctx)
+}
+
+func (s *Socket) ackTimerFunc() {
+	mu.Lock()
+	defer mu.Unlock()
+	if !s.acksScheduled || s.ctx == nil {
+		return
+	}
+	s.acksScheduled = false
+	s.issueDeferredAcks()
 }
 
 func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
@@ -307,6 +349,9 @@ func (s *Socket) closeLocked() error {
 	close(s.backlog)
 	close(s.nonUtpReads)
 	s.closed = true
+	s.ackTimer.Stop()
+	s.utpTimeoutChecker.Stop()
+	s.acksScheduled = false
 	return nil
 }
 
