@@ -13,30 +13,28 @@ import (
 	"github.com/anacrolix/missinggo/inproc"
 )
 
-func toSockaddrInet(ip net.IP, port int, zone string) (*C.struct_sockaddr, C.socklen_t) {
+func toSockaddrInet(ip net.IP, port int, zone string) (rsa syscall.RawSockaddrAny, len C.socklen_t) {
 	if ip4 := ip.To4(); ip4 != nil && zone == "" {
-		rsa := syscall.RawSockaddrInet4{
-			// Len:    syscall.SizeofSockaddrInet4,
-			Family: syscall.AF_INET,
-			Port:   uint16(port),
-		}
-		if n := copy(rsa.Addr[:], ip4); n != 4 {
+		rsa4 := (*syscall.RawSockaddrInet4)(unsafe.Pointer(&rsa))
+		rsa4.Family = syscall.AF_INET
+		rsa4.Port = uint16(port)
+		if n := copy(rsa4.Addr[:], ip4); n != 4 {
 			panic(n)
 		}
-		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
+		len = C.socklen_t(unsafe.Sizeof(*rsa4))
+		return
 	}
-	rsa := syscall.RawSockaddrInet6{
-		// Len:      syscall.SizeofSockaddrInet6,
-		Family:   syscall.AF_INET6,
-		Scope_id: zoneToScopeId(zone),
-		Port:     uint16(port),
-	}
+	rsa6 := (*syscall.RawSockaddrInet6)(unsafe.Pointer(&rsa))
+	rsa6.Family = syscall.AF_INET6
+	rsa6.Scope_id = zoneToScopeId(zone)
+	rsa6.Port = uint16(port)
 	if ip != nil {
-		if n := copy(rsa.Addr[:], ip); n != 16 {
+		if n := copy(rsa6.Addr[:], ip); n != 16 {
 			panic(n)
 		}
 	}
-	return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
+	len = C.socklen_t(unsafe.Sizeof(*rsa6))
+	return
 }
 
 func zoneToScopeId(zone string) uint32 {
@@ -81,15 +79,15 @@ func sockaddrToUDP(sa syscall.Sockaddr) net.Addr {
 	return nil
 }
 
-func netAddrToLibSockaddr(na net.Addr) (*C.struct_sockaddr, C.socklen_t) {
+func netAddrToLibSockaddr(na net.Addr) (rsa syscall.RawSockaddrAny, len C.socklen_t) {
 	switch v := na.(type) {
 	case *net.UDPAddr:
 		return toSockaddrInet(v.IP, v.Port, v.Zone)
 	case inproc.Addr:
-		rsa := syscall.RawSockaddrInet6{
-			Port: uint16(v.Port),
-		}
-		return (*C.struct_sockaddr)(unsafe.Pointer(&rsa)), C.socklen_t(unsafe.Sizeof(rsa))
+		rsa6 := (*syscall.RawSockaddrInet6)(unsafe.Pointer(&rsa))
+		rsa6.Port = uint16(v.Port)
+		len = C.socklen_t(unsafe.Sizeof(rsa))
+		return
 	default:
 		panic(na)
 	}

@@ -34,6 +34,9 @@ import (
 	"errors"
 	"net"
 	"time"
+	"unsafe"
+
+	"syscall"
 
 	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/inproc"
@@ -198,7 +201,9 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 			a := &args[i]
 			a.buf = (*C.byte)(&m.Buffers[0][0])
 			a.len = C.size_t(m.N)
-			a.sa, a.sal = netAddrToLibSockaddr(m.Addr)
+			var rsa syscall.RawSockaddrAny
+			rsa, a.sal = netAddrToLibSockaddr(m.Addr)
+			a.sa = (*C.struct_sockaddr)(unsafe.Pointer(&rsa))
 		}
 		C.process_received_messages(s.ctx, &args[0], C.size_t(len(ms)))
 	} else {
@@ -232,9 +237,10 @@ func (s *Socket) processReceivedMessage(b []byte, addr net.Addr) (utp bool) {
 // requires GODEBUG=cgocheck=0.
 const processPacketsInC = false
 
+var staticRsa syscall.RawSockaddrAny
+
 // Wraps libutp's utp_process_udp, returning relevant information.
 func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
-	sa, sal := netAddrToLibSockaddr(addr)
 	if len(b) == 0 {
 		// The implementation of utp_process_udp rejects null buffers, and
 		// anything smaller than the UTP header size. It's also prone to
@@ -256,7 +262,9 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 	if s.closed {
 		return false
 	}
-	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), sa, sal)
+	var sal C.socklen_t
+	staticRsa, sal = netAddrToLibSockaddr(addr)
+	ret := C.utp_process_udp(s.ctx, (*C.byte)(&b[0]), C.size_t(len(b)), (*C.struct_sockaddr)(unsafe.Pointer(&staticRsa)), sal)
 	switch ret {
 	case 1:
 		return true

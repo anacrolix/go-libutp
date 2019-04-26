@@ -305,7 +305,7 @@ func (c *Conn) Connect(ctx context.Context, network, addr string) error {
 	if c.s.closed {
 		return errSocketClosed
 	}
-	if n := C.utp_connect(c.us, sa, sl); n != 0 {
+	if n := C.utp_connect(c.us, (*C.struct_sockaddr)(unsafe.Pointer(&sa)), sl); n != 0 {
 		panic(n)
 	}
 	c.inited = true
