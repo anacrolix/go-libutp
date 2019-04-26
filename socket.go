@@ -79,26 +79,28 @@ func NewSocket(network, addr string) (*Socket, error) {
 	if err != nil {
 		return nil, err
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	ctx := C.utp_init(2)
-	if ctx == nil {
-		panic(ctx)
-	}
-	ctx.setCallbacks()
-	if utpLogging {
-		ctx.setOption(C.UTP_LOG_NORMAL, 1)
-		ctx.setOption(C.UTP_LOG_MTU, 1)
-		ctx.setOption(C.UTP_LOG_DEBUG, 1)
-	}
 	s := &Socket{
 		pc:          pc,
-		ctx:         ctx,
 		backlog:     make(chan *Conn, 5),
 		conns:       make(map[*C.utp_socket]*Conn),
 		nonUtpReads: make(chan packet, 100),
 	}
-	libContextToSocket[ctx] = s
+	func() {
+		mu.Lock()
+		defer mu.Unlock()
+		ctx := C.utp_init(2)
+		if ctx == nil {
+			panic(ctx)
+		}
+		s.ctx = ctx
+		ctx.setCallbacks()
+		if utpLogging {
+			ctx.setOption(C.UTP_LOG_NORMAL, 1)
+			ctx.setOption(C.UTP_LOG_MTU, 1)
+			ctx.setOption(C.UTP_LOG_DEBUG, 1)
+		}
+		libContextToSocket[ctx] = s
+	}()
 	go s.timeoutChecker()
 	go s.packetReader()
 	return s, nil
