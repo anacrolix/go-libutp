@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkThroughput(t *testing.B) {
+func benchmarkThroughput(t *testing.B, n int64) {
 	s1, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s1.Close()
@@ -32,11 +32,9 @@ func BenchmarkThroughput(t *testing.B) {
 	defer c1.Close()
 	<-accepted
 	defer c2.Close()
-	var n int64 = 100 << 20
 	t.SetBytes(n)
 	t.ReportAllocs()
 	for range iter.N(t.N) {
-		// log.Print(i)
 		doneReading := make(chan struct{})
 		go func() {
 			defer close(doneReading)
@@ -49,4 +47,16 @@ func BenchmarkThroughput(t *testing.B) {
 		require.EqualValues(t, n, wn)
 		<-doneReading
 	}
+}
+
+func BenchmarkThroughput100MB(t *testing.B) {
+	benchmarkThroughput(t, 100<<20)
+}
+
+func BenchmarkThroughput10MB(t *testing.B) {
+	benchmarkThroughput(t, 10<<20)
+}
+
+func BenchmarkThroughput1MB(t *testing.B) {
+	benchmarkThroughput(t, 1<<20)
 }
