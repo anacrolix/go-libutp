@@ -239,10 +239,12 @@ func (s *Socket) afterReceivingUtpMessages() {
 }
 
 func (s *Socket) issueDeferredAcks() {
+	expMap.Add("utp_issue_deferred_acks calls", 1)
 	C.utp_issue_deferred_acks(s.ctx)
 }
 
 func (s *Socket) checkUtpTimeouts() {
+	expMap.Add("utp_check_timeouts calls", 1)
 	C.utp_check_timeouts(s.ctx)
 }
 
