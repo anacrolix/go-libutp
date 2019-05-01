@@ -3,9 +3,11 @@ package utp
 import (
 	"context"
 	"log"
+	"math"
 	"net"
 	"sync"
 	"testing"
+	"testing/quick"
 	"time"
 
 	_ "github.com/anacrolix/envpprof"
@@ -195,4 +197,13 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 	require.NoError(t, err)
 	c.Close()
 	assertSocketConnsLen(t, s, 0)
+}
+
+// Ensure that adding math.MaxInt64 to any current timestamp will result in the maximum "when" field
+// for a Timer.
+func TestMaxExpiryTimerMath(t *testing.T) {
+	quick.Check(func(i int64) bool {
+		i += math.MaxInt64
+		return i == math.MaxInt64 || i < 0
+	}, nil)
 }

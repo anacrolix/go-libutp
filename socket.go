@@ -32,6 +32,7 @@ import "C"
 import (
 	"context"
 	"errors"
+	"math"
 	"net"
 	"time"
 	"unsafe"
@@ -98,18 +99,8 @@ func NewSocket(network, addr string) (*Socket, error) {
 		conns:       make(map[*C.utp_socket]*Conn),
 		nonUtpReads: make(chan packet, 100),
 	}
-	s.ackTimer = time.AfterFunc(-1, s.ackTimerFunc)
-	s.utpTimeoutChecker = time.AfterFunc(utpCheckTimeoutInterval, func() {
-		mu.Lock()
-		ok := s.ctx != nil
-		if ok {
-			s.checkUtpTimeouts()
-		}
-		mu.Unlock()
-		if ok {
-			s.utpTimeoutChecker.Reset(utpCheckTimeoutInterval)
-		}
-	})
+	s.ackTimer = time.AfterFunc(math.MaxInt64, s.ackTimerFunc)
+	s.ackTimer.Stop()
 	func() {
 		mu.Lock()
 		defer mu.Unlock()
@@ -125,8 +116,8 @@ func NewSocket(network, addr string) (*Socket, error) {
 			ctx.setOption(C.UTP_LOG_DEBUG, 1)
 		}
 		libContextToSocket[ctx] = s
+		s.utpTimeoutChecker = time.AfterFunc(0, s.timeoutCheckerTimerFunc)
 	}()
-	go s.timeoutChecker()
 	go s.packetReader()
 	return s, nil
 }
@@ -317,18 +308,16 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 	}
 }
 
-func (s *Socket) timeoutChecker() {
-	for {
-		mu.Lock()
-		if s.closed {
-			mu.Unlock()
-			return
-		}
-		// C.utp_issue_deferred_acks(s.ctx)
-		C.utp_check_timeouts(s.ctx)
-		mu.Unlock()
-		time.Sleep(500 * time.Millisecond)
+func (s *Socket) timeoutCheckerTimerFunc() {
+	mu.Lock()
+	ok := s.ctx != nil
+	if ok {
+		s.checkUtpTimeouts()
 	}
+	if ok {
+		s.utpTimeoutChecker.Reset(utpCheckTimeoutInterval)
+	}
+	mu.Unlock()
 }
 
 func (s *Socket) Close() error {
