@@ -58,9 +58,7 @@ func TestNettestTestConnSwappedIp6(t *testing.T) {
 }
 
 func connPairSocket(s *Socket) (dialed net.Conn, accepted net.Conn) {
-	var (
-		wg sync.WaitGroup
-	)
+	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()

@@ -31,7 +31,7 @@ func getConn(listen bool, addr string, s *utp.Socket) net.Conn {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Flags())
-	var flags = struct {
+	flags := struct {
 		Listen bool `name:"l"`
 		tagflag.StartPos
 		Addr string

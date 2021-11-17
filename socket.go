@@ -29,15 +29,15 @@ void process_received_messages(utp_context *ctx, struct utp_process_udp_args *ar
 }
 */
 import "C"
+
 import (
 	"context"
 	"errors"
 	"math"
 	"net"
+	"syscall"
 	"time"
 	"unsafe"
-
-	"syscall"
 
 	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/inproc"
