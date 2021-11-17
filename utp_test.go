@@ -147,6 +147,7 @@ func TestConnSendBuffer(t *testing.T) {
 }
 
 func TestCanHandleConnectWriteErrors(t *testing.T) {
+	t.Parallel()
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
