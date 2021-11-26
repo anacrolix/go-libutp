@@ -148,7 +148,6 @@ func acceptCallback(a *C.utp_callback_arguments) C.uint64 {
 	s := getSocketForLibContext(a.context)
 	c := s.newConn(a.socket)
 	c.setRemoteAddr()
-	c.inited = true
 	s.pushBacklog(c)
 	return 0
 }

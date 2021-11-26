@@ -33,6 +33,7 @@ import "C"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"net"
 	"syscall"
@@ -393,26 +394,29 @@ func resolveAddr(network, addr string) (net.Addr, error) {
 }
 
 // Passing an empty network will use the network of the Socket's listener.
-func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	c, err := s.NewConn()
-	if err != nil {
-		return nil, err
+func (s *Socket) DialContext(ctx context.Context, network, addr string) (_ net.Conn, err error) {
+	if network == "" {
+		network = s.pc.LocalAddr().Network()
 	}
-	err = c.Connect(ctx, network, addr)
+	ua, err := resolveAddr(network, addr)
 	if err != nil {
-		c.Close()
-		return nil, err
+		return nil, fmt.Errorf("error resolving address: %v", err)
 	}
-	return c, nil
-}
-
-func (s *Socket) NewConn() (*Conn, error) {
+	sa, sl := netAddrToLibSockaddr(ua)
 	mu.Lock()
 	defer mu.Unlock()
 	if s.closed {
-		return nil, errors.New("socket closed")
+		return nil, errSocketClosed
 	}
-	return s.newConn(C.utp_create_socket(s.ctx)), nil
+	utpSock := utpCreateSocketAndConnect(s.ctx, sa, sl)
+	c := s.newConn(utpSock)
+	c.setRemoteAddr()
+	err = c.waitForConnect(ctx)
+	if err != nil {
+		c.close()
+		return
+	}
+	return c, err
 }
 
 func (s *Socket) pushBacklog(c *Conn) {

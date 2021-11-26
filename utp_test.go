@@ -151,40 +151,26 @@ func TestCanHandleConnectWriteErrors(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
-	c, err := s.NewConn()
-	require.NoError(t, err)
-	gotError := false
-	c.OnError(func(err error) {
-		gotError = true
-		log.Printf("notified of error: %s", err)
-		c.Close()
-	})
-	err = c.Connect(context.Background(), "", "localhost:0")
-	assert.Equal(t, func() error {
-		if gotError {
-			return ErrConnClosed
-		} else {
-			// I don't think Windows gives errors writing to bad addresses, so
-			// it should timeout instead.
-			return errorForCode(TimedOut)
-		}
-	}(), err)
+	_, err = s.DialContext(context.Background(), "", "localhost:0")
+	require.Error(t, err)
 }
 
 func TestConnectConnAfterSocketClose(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
-	defer s.Close()
-	c, err := s.NewConn()
-	require.NoError(t, err)
-	defer c.Close()
 	s.Close()
-	assert.Equal(t, errSocketClosed, c.Connect(context.Background(), "", ""))
+	_, err = s.DialContext(context.Background(), "", "")
+	require.Equal(t, errSocketClosed, err)
 }
 
 func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 	mu.Lock()
-	assert.Len(t, s.conns, l)
+	for len(s.conns) != l {
+		log.Printf("%v has %v conns (waiting for %v)", s, len(s.conns), l)
+		mu.Unlock()
+		time.Sleep(time.Second)
+		mu.Lock()
+	}
 	mu.Unlock()
 }
 
@@ -192,9 +178,16 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
-	c, err := s.NewConn()
-	require.NoError(t, err)
-	c.Close()
+	c, err := s.DialContext(context.Background(), "", s.LocalAddr().String())
+	t.Logf("connecting to own socket: %v", err)
+	if err == nil {
+		c.Close()
+		go func() {
+			c, err := s.Accept()
+			log.Printf("accepted: %v", err)
+			c.Close()
+		}()
+	}
 	assertSocketConnsLen(t, s, 0)
 }
 
