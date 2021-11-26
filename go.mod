@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/anacrolix/envpprof v0.0.0-20180404065416-323002cec2fa
+	github.com/anacrolix/lsan v0.0.0-20211126052245-807000409a62
 	github.com/anacrolix/missinggo v0.0.0-20180725070939-60ef2fbf63df
 	github.com/anacrolix/mmsg v0.0.0-20180515031531-a4a3ba1fc8bb
 	github.com/anacrolix/sync v0.0.0-20180808010631-44578de4e778
