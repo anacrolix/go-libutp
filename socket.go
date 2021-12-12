@@ -51,17 +51,22 @@ const (
 )
 
 type Socket struct {
-	pc               net.PacketConn
-	ctx              *C.utp_context
-	backlog          chan *Conn
-	closed           bool
-	conns            map[*C.utp_socket]*Conn
-	nonUtpReads      chan packet
-	writeDeadline    time.Time
-	readDeadline     time.Time
-	firewallCallback FirewallCallback
+	pc            net.PacketConn
+	ctx           *C.utp_context
+	backlog       chan *Conn
+	closed        bool
+	conns         map[*C.utp_socket]*Conn
+	nonUtpReads   chan packet
+	writeDeadline time.Time
+	readDeadline  time.Time
+
+	// This is called without the package mutex, without knowing if the result will be needed.
+	asyncFirewallCallback FirewallCallback
 	// Whether the next accept is to be blocked.
-	block bool
+	asyncBlock bool
+
+	// This is called with the package mutex, and preferred.
+	syncFirewallCallback FirewallCallback
 
 	acksScheduled bool
 	ackTimer      *time.Timer
@@ -69,6 +74,8 @@ type Socket struct {
 	utpTimeoutChecker *time.Timer
 }
 
+// A firewall callback returns true if an incoming connection request should be ignored. This is
+// better than just accepting and closing, as it means no acknowledgement packet is sent.
 type FirewallCallback func(net.Addr) bool
 
 var (
@@ -287,14 +294,17 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 		return false
 	}
 	mu.Unlock()
-	block := func() bool {
-		if s.firewallCallback == nil {
+	// TODO: If it's okay to call the firewall callback without the package lock, aren't we assuming
+	// that the next UDP packet to be processed by libutp has to be the one we've just used the
+	// callback for? Why can't we assign directly to Socket.asyncBlock?
+	asyncBlock := func() bool {
+		if s.asyncFirewallCallback == nil || s.syncFirewallCallback != nil {
 			return false
 		}
-		return s.firewallCallback(addr)
+		return s.asyncFirewallCallback(addr)
 	}()
 	mu.Lock()
-	s.block = block
+	s.asyncBlock = asyncBlock
 	if s.closed {
 		return false
 	}
@@ -494,8 +504,21 @@ func (s *Socket) SetOption(opt Option, val int) int {
 	return int(C.utp_context_set_option(s.ctx, opt, C.int(val)))
 }
 
+// The callback is used before each packet is processed by libutp without the this package's mutex
+// being held. libutp may not actually need the result as the packet might not be a connection
+// attempt. If the callback function is expensive, it may be worth setting a synchronous callback
+// using SetSyncFirewallCallback.
 func (s *Socket) SetFirewallCallback(f FirewallCallback) {
 	mu.Lock()
-	s.firewallCallback = f
+	s.asyncFirewallCallback = f
+	mu.Unlock()
+}
+
+// SetSyncFirewallCallback sets a synchronous firewall callback. It's only called as needed by
+// libutp. It is called with the package-wide mutex held. Any locks acquired by the callback should
+// not also be held by code that might use this package.
+func (s *Socket) SetSyncFirewallCallback(f FirewallCallback) {
+	mu.Lock()
+	s.syncFirewallCallback = f
 	mu.Unlock()
 }
