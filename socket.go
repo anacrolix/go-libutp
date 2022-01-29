@@ -40,6 +40,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/inproc"
 	"github.com/anacrolix/mmsg"
@@ -72,6 +73,8 @@ type Socket struct {
 	ackTimer      *time.Timer
 
 	utpTimeoutChecker *time.Timer
+
+	logger log.Logger
 }
 
 // A firewall callback returns true if an incoming connection request should be ignored. This is
