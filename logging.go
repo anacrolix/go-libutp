@@ -21,6 +21,10 @@ var Logger = log.Logger{log.StreamLogger{
 			time.Now().Format("2006-01-02T15:04:05-0700"),
 			msg.Text(),
 		))
+
+		if ret[len(ret)-1] != '\n' {
+			ret = append(ret, '\n')
+		}
 		return ret
 	},
 }}
