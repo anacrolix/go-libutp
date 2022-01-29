@@ -204,10 +204,10 @@ func (s *Socket) packetReader() {
 			// an endless stream of errors (such as the PacketConn being
 			// Closed outside of our control, this work around may need to be
 			// reconsidered.
-			Logger.Printf("ignoring socket read error: %s", err)
+			s.logger.Printf("ignoring socket read error: %s", err)
 			consecutiveErrors++
 			if consecutiveErrors >= 100 {
-				Logger.Print("too many consecutive errors, closing socket")
+				s.logger.Print("too many consecutive errors, closing socket")
 				s.Close()
 				return
 			}
