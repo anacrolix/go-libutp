@@ -1,8 +1,11 @@
 package utp
 
 import (
-	"log"
+	"fmt"
 	"os"
+	"time"
+
+	"github.com/anacrolix/log"
 )
 
 const (
@@ -10,4 +13,14 @@ const (
 	utpLogging   = false
 )
 
-var Logger = log.New(os.Stderr, "go-libutp: ", log.LstdFlags|log.Lshortfile)
+var Logger = log.Logger{log.StreamLogger{
+	W: os.Stderr,
+	Fmt: func(msg log.Msg) []byte {
+		ret := []byte(fmt.Sprintf(
+			"%s go-libutp: %s",
+			time.Now().Format("2006-01-02T15:04:05-0700"),
+			msg.Text(),
+		))
+		return ret
+	},
+}}
