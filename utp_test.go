@@ -11,6 +11,7 @@ import (
 	"time"
 
 	_ "github.com/anacrolix/envpprof"
+	alog "github.com/anacrolix/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/nettest"
@@ -22,7 +23,7 @@ func init() {
 
 func doNettestTestConn(t *testing.T, swapConns bool, host string) {
 	nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-		s, err := NewSocket("inproc", net.JoinHostPort(host, "0"))
+		s, err := NewSocket("inproc", net.JoinHostPort(host, "0"), alog.Logger{})
 		if err != nil {
 			return
 		}
@@ -88,7 +89,7 @@ func TestLibutpDialTimesOut(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s.Close()
 	_, err = s.Dial(neverResponds)
@@ -98,7 +99,7 @@ func TestLibutpDialTimesOut(t *testing.T) {
 // Ensure that our timeout is honored during dialing.
 func TestDialTimeout(t *testing.T) {
 	t.Parallel()
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s.Close()
 	const timeout = time.Second
@@ -111,10 +112,10 @@ func TestDialTimeout(t *testing.T) {
 }
 
 func TestConnSendBuffer(t *testing.T) {
-	s0, err := NewSocket("udp", "localhost:0")
+	s0, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s0.Close()
-	s1, err := NewSocket("udp", "localhost:0")
+	s1, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s1.Close()
 	var (
@@ -148,7 +149,7 @@ func TestConnSendBuffer(t *testing.T) {
 
 func TestCanHandleConnectWriteErrors(t *testing.T) {
 	t.Parallel()
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s.Close()
 	_, err = s.DialContext(context.Background(), "", "localhost:0")
@@ -156,7 +157,7 @@ func TestCanHandleConnectWriteErrors(t *testing.T) {
 }
 
 func TestConnectConnAfterSocketClose(t *testing.T) {
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	s.Close()
 	_, err = s.DialContext(context.Background(), "", "")
@@ -175,7 +176,7 @@ func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 }
 
 func TestSocketConnsAfterConnClosed(t *testing.T) {
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", alog.Logger{})
 	require.NoError(t, err)
 	defer s.Close()
 	c, err := s.DialContext(context.Background(), "", s.LocalAddr().String())

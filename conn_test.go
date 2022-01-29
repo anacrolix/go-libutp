@@ -4,12 +4,13 @@ import (
 	"net"
 	"testing"
 
+	"github.com/anacrolix/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConnMethodsAfterClose(t *testing.T) {
-	s, err := NewSocket("udp", "localhost:0")
+	s, err := NewSocket("udp", "localhost:0", log.Logger{})
 	require.NoError(t, err)
 	defer s.Close()
 	d, a := connPairSocket(s)

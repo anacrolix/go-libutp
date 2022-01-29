@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo"
 	"github.com/bradfitz/iter"
 
@@ -13,10 +14,10 @@ import (
 )
 
 func benchmarkThroughput(t *testing.B, n int64) {
-	s1, err := NewSocket("udp", "localhost:0")
+	s1, err := NewSocket("udp", "localhost:0", log.Logger{})
 	require.NoError(t, err)
 	defer s1.Close()
-	s2, err := NewSocket("udp", "localhost:0")
+	s2, err := NewSocket("udp", "localhost:0", log.Logger{})
 	require.NoError(t, err)
 	defer s2.Close()
 	var c2 net.Conn
