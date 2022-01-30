@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/anacrolix/log"
 	"github.com/bradfitz/iter"
 	qt "github.com/frankban/quicktest"
 )
@@ -15,7 +14,7 @@ import (
 // sendtoCallback in this instance.
 func TestSendToRaceErrorAddr(t *testing.T) {
 	c := qt.New(t)
-	s, err := NewSocket("udp", "localhost:0", log.Logger{})
+	s, err := NewSocket("udp", "localhost:0")
 	c.Assert(err, qt.IsNil)
 	defer s.Close()
 	ctx, cancel := context.WithCancel(context.Background())

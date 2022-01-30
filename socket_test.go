@@ -3,13 +3,12 @@ package utp
 import (
 	"testing"
 
-	"github.com/anacrolix/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUseClosedSocket(t *testing.T) {
-	s, err := NewSocket("udp", "localhost:0", log.Logger{})
+	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	assert.NoError(t, s.Close())
 	assert.NotPanics(t, func() { s.Close() })
@@ -19,7 +18,7 @@ func TestUseClosedSocket(t *testing.T) {
 }
 
 func TestSocketNetwork(t *testing.T) {
-	s, err := NewSocket("udp", "localhost:0", log.Logger{})
+	s, err := NewSocket("udp", "localhost:0")
 	require.NoError(t, err)
 	defer s.Close()
 	assert.Equal(t, "udp", s.Addr().Network())
