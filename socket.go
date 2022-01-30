@@ -99,14 +99,14 @@ func listenPacket(network, addr string) (pc net.PacketConn, err error) {
 	return net.ListenPacket(network, addr)
 }
 
-func NewSocket(network, addr string, logger log.Logger) (*Socket, error) {
+func NewSocket(network, addr string) (*Socket, error) {
+	return NewSocketWithLogger(network, addr, Logger)
+}
+
+func NewSocketWithLogger(network, addr string, logger log.Logger) (*Socket, error) {
 	pc, err := listenPacket(network, addr)
 	if err != nil {
 		return nil, err
-	}
-
-	if logger.IsZero() {
-		logger = Logger
 	}
 
 	s := &Socket{
