@@ -105,8 +105,7 @@ func NewSocket(network, addr string, logger log.Logger) (*Socket, error) {
 		return nil, err
 	}
 
-	zero := log.Logger{}
-	if logger == zero {
+	if logger.IsZero() {
 		logger = Logger
 	}
 
