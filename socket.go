@@ -99,11 +99,7 @@ func listenPacket(network, addr string) (pc net.PacketConn, err error) {
 	return net.ListenPacket(network, addr)
 }
 
-func NewSocket(network, addr string) (*Socket, error) {
-	return NewSocketWithLogger(network, addr, Logger)
-}
-
-func NewSocketWithLogger(network, addr string, logger log.Logger) (*Socket, error) {
+func NewSocket(network, addr string, logger ...log.Logger) (*Socket, error) {
 	pc, err := listenPacket(network, addr)
 	if err != nil {
 		return nil, err
@@ -114,10 +110,16 @@ func NewSocketWithLogger(network, addr string, logger log.Logger) (*Socket, erro
 		backlog:     make(chan *Conn, 5),
 		conns:       make(map[*C.utp_socket]*Conn),
 		nonUtpReads: make(chan packet, 100),
-		logger:      logger,
 	}
 	s.ackTimer = time.AfterFunc(math.MaxInt64, s.ackTimerFunc)
 	s.ackTimer.Stop()
+
+	if len(logger) > 0 {
+		s.logger = logger[0]
+	} else {
+		s.logger = Logger
+	}
+
 	func() {
 		mu.Lock()
 		defer mu.Unlock()
