@@ -7,4 +7,5 @@ const (
 	utpLogging   = false
 )
 
+// The default Socket Logger. Override per Socket by using WithLogger with NewSocket.
 var Logger = log.Default.WithContextText("go-libutp")
