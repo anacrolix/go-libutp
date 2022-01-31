@@ -2,7 +2,6 @@ package utp
 
 import (
 	"context"
-	"log"
 	"math"
 	"net"
 	"sync"
@@ -15,10 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/nettest"
 )
-
-func init() {
-	log.SetFlags(log.Flags() | log.Lshortfile)
-}
 
 func doNettestTestConn(t *testing.T, swapConns bool, host string) {
 	nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
@@ -166,7 +161,7 @@ func TestConnectConnAfterSocketClose(t *testing.T) {
 func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 	mu.Lock()
 	for len(s.conns) != l {
-		log.Printf("%v has %v conns (waiting for %v)", s, len(s.conns), l)
+		s.logger.Printf("%v has %v conns (waiting for %v)", s, len(s.conns), l)
 		mu.Unlock()
 		time.Sleep(time.Second)
 		mu.Lock()
@@ -184,7 +179,7 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 		c.Close()
 		go func() {
 			c, err := s.Accept()
-			log.Printf("accepted: %v", err)
+			s.logger.Printf("accepted: %v", err)
 			c.Close()
 		}()
 	}

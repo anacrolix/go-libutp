@@ -40,6 +40,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/anacrolix/log"
 	"github.com/anacrolix/missinggo"
 	"github.com/anacrolix/missinggo/inproc"
 	"github.com/anacrolix/mmsg"
@@ -72,6 +73,8 @@ type Socket struct {
 	ackTimer      *time.Timer
 
 	utpTimeoutChecker *time.Timer
+
+	logger log.Logger
 }
 
 // A firewall callback returns true if an incoming connection request should be ignored. This is
@@ -96,11 +99,12 @@ func listenPacket(network, addr string) (pc net.PacketConn, err error) {
 	return net.ListenPacket(network, addr)
 }
 
-func NewSocket(network, addr string) (*Socket, error) {
+func NewSocket(network, addr string, logger ...log.Logger) (*Socket, error) {
 	pc, err := listenPacket(network, addr)
 	if err != nil {
 		return nil, err
 	}
+
 	s := &Socket{
 		pc:          pc,
 		backlog:     make(chan *Conn, 5),
@@ -109,6 +113,13 @@ func NewSocket(network, addr string) (*Socket, error) {
 	}
 	s.ackTimer = time.AfterFunc(math.MaxInt64, s.ackTimerFunc)
 	s.ackTimer.Stop()
+
+	if len(logger) > 0 {
+		s.logger = logger[0]
+	} else {
+		s.logger = Logger
+	}
+
 	func() {
 		mu.Lock()
 		defer mu.Unlock()
@@ -194,10 +205,10 @@ func (s *Socket) packetReader() {
 			// an endless stream of errors (such as the PacketConn being
 			// Closed outside of our control, this work around may need to be
 			// reconsidered.
-			Logger.Printf("ignoring socket read error: %s", err)
+			s.logger.Printf("ignoring socket read error: %s", err)
 			consecutiveErrors++
 			if consecutiveErrors >= 100 {
-				Logger.Print("too many consecutive errors, closing socket")
+				s.logger.Print("too many consecutive errors, closing socket")
 				s.Close()
 				return
 			}

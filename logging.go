@@ -1,13 +1,10 @@
 package utp
 
-import (
-	"log"
-	"os"
-)
+import "github.com/anacrolix/log"
 
 const (
 	logCallbacks = false
 	utpLogging   = false
 )
 
-var Logger = log.New(os.Stderr, "go-libutp: ", log.LstdFlags|log.Lshortfile)
+var Logger = log.Default.WithContextText("go-libutp")
