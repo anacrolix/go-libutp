@@ -68,7 +68,7 @@ func sendtoCallback(a *C.utp_callback_arguments) (ret C.uint64) {
 			// Rate-limited. Probably Linux. The implementation might try
 			// again later.
 		} else {
-			s.logger.Printf("error sending packet: %s", err)
+			//s.logger.Printf("error sending packet: %s", err)
 		}
 		return
 	}
