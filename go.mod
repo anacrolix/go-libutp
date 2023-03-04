@@ -14,5 +14,5 @@ require (
 	github.com/frankban/quicktest v1.9.0
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20180524181706-dfa909b99c79
+	golang.org/x/net v0.7.0
 )
