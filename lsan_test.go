@@ -14,7 +14,7 @@ import (
 // Use this with ASAN_OPTIONS=detect_leaks=1 go test -tags lsan.
 func TestMain(m *testing.M) {
 	log.Printf("lsan main running")
-	lsan.LeakABit()
+	//lsan.LeakABit()
 	code := m.Run()
 	lsan.LsanDoLeakCheck()
 	os.Exit(code)
