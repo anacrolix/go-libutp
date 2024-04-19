@@ -8,7 +8,6 @@ import (
 
 	"github.com/anacrolix/missinggo"
 	"github.com/bradfitz/iter"
-
 	"github.com/stretchr/testify/require"
 )
 
