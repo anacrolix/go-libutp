@@ -6,13 +6,12 @@ package utp
 import "C"
 
 import (
+	"log/slog"
 	"net"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"unsafe"
-
-	"github.com/anacrolix/log"
 )
 
 type utpCallbackArguments C.utp_callback_arguments
@@ -56,8 +55,8 @@ func sendtoCallback(a *utpCallbackArguments) (ret C.uint64) {
 		panic(err)
 	}
 	newSends := atomic.AddInt64(&sends, 1)
-	if logCallbacks {
-		s.logger.Printf("sending %d bytes, %d packets", len(b), newSends)
+	if s.logCallbacks {
+		s.logger.Info("sending %d bytes, %d packets", len(b), newSends)
 	}
 	expMap.Add("socket PacketConn writes", 1)
 	n, err := s.pc.WriteTo(b, &sendToUdpAddr)
@@ -76,13 +75,13 @@ func sendtoCallback(a *utpCallbackArguments) (ret C.uint64) {
 			// Rate-limited. Probably Linux. The implementation might try
 			// again later.
 		} else {
-			s.logger.Levelf(log.Debug, "error sending packet: %v", err)
+			slog.Debug("error sending packet", "error", err)
 		}
 		return
 	}
 	if n != len(b) {
 		expMap.Add("socket PacketConn short writes", 1)
-		s.logger.Printf("expected to send %d bytes but only sent %d", len(b), n)
+		s.logger.Info("expected to send %d bytes but only sent %d", len(b), n)
 	}
 	return
 }
@@ -91,8 +90,8 @@ func sendtoCallback(a *utpCallbackArguments) (ret C.uint64) {
 func errorCallback(a *utpCallbackArguments) C.uint64 {
 	s := getSocketForLibContext(a.goContext())
 	err := errorForCode(a.error_code())
-	if logCallbacks {
-		s.logger.Printf("error callback: socket %p: %s", a.socket, err)
+	if s.logCallbacks {
+		s.logger.Info("error callback: socket %p: %s", a.socket, err)
 	}
 	libContextToSocket[a.goContext()].conns[a.socket].onError(err)
 	return 0
@@ -101,7 +100,7 @@ func errorCallback(a *utpCallbackArguments) C.uint64 {
 //export logCallback
 func logCallback(a *utpCallbackArguments) C.uint64 {
 	s := getSocketForLibContext(a.goContext())
-	s.logger.Printf("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
+	s.logger.Info("libutp: %s", C.GoString((*C.char)(unsafe.Pointer(a.buf))))
 	return 0
 }
 
@@ -109,8 +108,8 @@ func logCallback(a *utpCallbackArguments) C.uint64 {
 func stateChangeCallback(a *utpCallbackArguments) C.uint64 {
 	s := libContextToSocket[a.goContext()]
 	c := s.conns[a.socket]
-	if logCallbacks {
-		s.logger.Printf("state changed: conn %p: %s", c, libStateName(a.state()))
+	if s.logCallbacks {
+		s.logger.Info("state changed: conn %p: %s", c, libStateName(a.state()))
 	}
 	switch a.state() {
 	case C.UTP_STATE_CONNECT:
@@ -138,8 +137,8 @@ func readCallback(a *utpCallbackArguments) C.uint64 {
 	s := libContextToSocket[a.goContext()]
 	c := s.conns[a.socket]
 	b := a.bufBytes()
-	if logCallbacks {
-		s.logger.Printf("read callback: conn %p: %d bytes", c, len(b))
+	if s.logCallbacks {
+		s.logger.Info("read callback: conn %p: %d bytes", c, len(b))
 	}
 	if len(b) == 0 {
 		panic("that will break the read drain invariant")
@@ -152,8 +151,8 @@ func readCallback(a *utpCallbackArguments) C.uint64 {
 //export acceptCallback
 func acceptCallback(a *utpCallbackArguments) C.uint64 {
 	s := getSocketForLibContext(a.goContext())
-	if logCallbacks {
-		s.logger.Printf("accept callback: %#v", *a)
+	if s.logCallbacks {
+		s.logger.Info("accept callback: %#v", *a)
 	}
 	c := s.newConn(a.socket)
 	c.setRemoteAddr()

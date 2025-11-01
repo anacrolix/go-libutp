@@ -7,8 +7,7 @@ import "C"
 
 import (
 	"errors"
-
-	"github.com/anacrolix/sync"
+	"sync"
 )
 
 type Option = C.int

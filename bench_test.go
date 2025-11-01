@@ -2,12 +2,11 @@ package utp
 
 import (
 	"io"
-	"io/ioutil"
 	"net"
 	"testing"
 
-	"github.com/anacrolix/missinggo"
 	"github.com/bradfitz/iter"
+	"github.com/james-lawrence/go-libutp/internal/iox"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,11 +36,11 @@ func benchmarkThroughput(t *testing.B, n int64) {
 		doneReading := make(chan struct{})
 		go func() {
 			defer close(doneReading)
-			wn, err := io.CopyN(ioutil.Discard, c2, n)
+			wn, err := io.CopyN(io.Discard, c2, n)
 			require.NoError(t, err)
 			require.EqualValues(t, n, wn)
 		}()
-		wn, err := io.CopyN(c1, missinggo.ZeroReader, n)
+		wn, err := io.CopyN(c1, iox.ZeroReader, n)
 		require.NoError(t, err)
 		require.EqualValues(t, n, wn)
 		<-doneReading

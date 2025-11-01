@@ -1,0 +1,25 @@
+package netx
+
+import (
+	"net"
+	"strconv"
+)
+
+func AddrPort(addr net.Addr) int {
+	switch raw := addr.(type) {
+	case *net.UDPAddr:
+		return raw.Port
+	case *net.TCPAddr:
+		return raw.Port
+	default:
+		_, port, err := net.SplitHostPort(addr.String())
+		if err != nil {
+			panic(err)
+		}
+		i64, err := strconv.ParseInt(port, 0, 0)
+		if err != nil {
+			panic(err)
+		}
+		return int(i64)
+	}
+}

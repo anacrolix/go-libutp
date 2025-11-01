@@ -34,16 +34,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net"
 	"syscall"
 	"time"
 	"unsafe"
 
-	"github.com/anacrolix/log"
-	"github.com/anacrolix/missinggo"
-	"github.com/anacrolix/missinggo/inproc"
-	"github.com/anacrolix/mmsg"
+	"github.com/james-lawrence/go-libutp/internal/netx"
+	"github.com/james-lawrence/go-libutp/mmsg"
 )
 
 const (
@@ -74,7 +73,9 @@ type Socket struct {
 
 	utpTimeoutChecker *time.Timer
 
-	logger log.Logger
+	logger       *slog.Logger
+	logCallbacks bool
+	utpLogging   bool
 }
 
 // A firewall callback returns true if an incoming connection request should be ignored. This is
@@ -93,15 +94,12 @@ type packet struct {
 }
 
 func listenPacket(network, addr string) (pc net.PacketConn, err error) {
-	if network == "inproc" {
-		return inproc.ListenPacket(network, addr)
-	}
 	return net.ListenPacket(network, addr)
 }
 
 type NewSocketOpt func(s *Socket)
 
-func WithLogger(l log.Logger) NewSocketOpt {
+func WithLogger(l *slog.Logger) NewSocketOpt {
 	return func(s *Socket) {
 		s.logger = l
 	}
@@ -118,7 +116,7 @@ func NewSocket(network, addr string, opts ...NewSocketOpt) (*Socket, error) {
 		backlog:     make(chan *Conn, 5),
 		conns:       make(map[*C.utp_socket]*Conn),
 		nonUtpReads: make(chan packet, 100),
-		logger:      Logger,
+		logger:      slog.Default(),
 	}
 	s.ackTimer = time.AfterFunc(math.MaxInt64, s.ackTimerFunc)
 	s.ackTimer.Stop()
@@ -136,7 +134,7 @@ func NewSocket(network, addr string, opts ...NewSocketOpt) (*Socket, error) {
 		}
 		s.ctx = ctx
 		ctx.setCallbacks()
-		if utpLogging {
+		if s.utpLogging {
 			ctx.setOption(C.UTP_LOG_NORMAL, 1)
 			ctx.setOption(C.UTP_LOG_MTU, 1)
 			ctx.setOption(C.UTP_LOG_DEBUG, 1)
@@ -212,10 +210,10 @@ func (s *Socket) packetReader() {
 			// an endless stream of errors (such as the PacketConn being
 			// Closed outside of our control, this work around may need to be
 			// reconsidered.
-			s.logger.Printf("ignoring socket read error: %s", err)
+			s.logger.Info("ignoring socket read", "error", err)
 			consecutiveErrors++
 			if consecutiveErrors >= 100 {
-				s.logger.Print("too many consecutive errors, closing socket")
+				s.logger.Info("too many consecutive errors, closing socket")
 				s.Close()
 				return
 			}
@@ -308,7 +306,7 @@ func (s *Socket) utpProcessUdp(b []byte, addr net.Addr) (utp bool) {
 		// assert on those, which we don't want to trigger.
 		return false
 	}
-	if missinggo.AddrPort(addr) == 0 {
+	if netx.AddrPort(addr) == 0 {
 		return false
 	}
 	mu.Unlock()
@@ -413,12 +411,7 @@ func (s *Socket) resolveAddr(network, addr string) (net.Addr, error) {
 }
 
 func resolveAddr(network, addr string) (net.Addr, error) {
-	switch network {
-	case "inproc":
-		return inproc.ResolveAddr(network, addr)
-	default:
-		return net.ResolveUDPAddr(network, addr)
-	}
+	return net.ResolveUDPAddr(network, addr)
 }
 
 // Passing an empty network will use the network of the Socket's listener.

@@ -9,7 +9,6 @@ import (
 	"testing/quick"
 	"time"
 
-	_ "github.com/anacrolix/envpprof"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/nettest"
@@ -17,7 +16,7 @@ import (
 
 func doNettestTestConn(t *testing.T, swapConns bool, host string) {
 	nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-		s, err := NewSocket("inproc", net.JoinHostPort(host, "0"))
+		s, err := NewSocket("udp", net.JoinHostPort(host, "0"))
 		if err != nil {
 			return
 		}
@@ -161,7 +160,7 @@ func TestConnectConnAfterSocketClose(t *testing.T) {
 func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 	mu.Lock()
 	for len(s.conns) != l {
-		s.logger.Printf("%v has %v conns (waiting for %v)", s, len(s.conns), l)
+		s.logger.Info("%v has %v conns (waiting for %v)", s, len(s.conns), l)
 		mu.Unlock()
 		time.Sleep(time.Second)
 		mu.Lock()
@@ -179,7 +178,7 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 		c.Close()
 		go func() {
 			c, err := s.Accept()
-			s.logger.Printf("accepted: %v", err)
+			s.logger.Info("accepted", "error", err)
 			c.Close()
 		}()
 	}
