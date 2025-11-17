@@ -9,12 +9,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go-version: [ '1.19', '1.20' ]
+        go-version: [ 'stable', 'oldstable' ]
         os: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2    
+    - uses: actions/setup-go@v6
+      with:
+        go-version: ${{ matrix.go-version }}
+    - run: go version
     - run: go test -race -count 2 ./...
     - run: go test -bench . -count 2 ./... -v -race
     - run: go test ./...
@@ -24,10 +27,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go-version: [ '1.19', '1.20' ]
+        go-version: [ 'stable', 'oldstable' ]
         os: [ubuntu-latest]
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@v6
+      with:
+        go-version: ${{ matrix.go-version }}
+    - run: go version
     - run: ASAN_OPTIONS=detect_leaks=1 go test -tags lsan ./...
