@@ -33,22 +33,18 @@ func doNettestTestConn(t *testing.T, swapConns bool, host string) {
 }
 
 func TestNettestTestConn(t *testing.T) {
-	t.Parallel()
 	doNettestTestConn(t, false, "127.0.0.1")
 }
 
 func TestNettestTestConnIp6(t *testing.T) {
-	t.Parallel()
 	doNettestTestConn(t, false, "::1")
 }
 
 func TestNettestTestConnSwapped(t *testing.T) {
-	t.Parallel()
 	doNettestTestConn(t, true, "127.0.0.1")
 }
 
 func TestNettestTestConnSwappedIp6(t *testing.T) {
-	t.Parallel()
 	doNettestTestConn(t, true, "::1")
 }
 
