@@ -6,3 +6,5 @@
 [![Appveyor Status](https://ci.appveyor.com/api/projects/status/github/anacrolix/go-libutp?branch=master&svg=true)](https://ci.appveyor.com/project/anacrolix/go-libutp)
 
 This is a Go wrapper for [libutp](https://github.com/bittorrent/libutp).
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
