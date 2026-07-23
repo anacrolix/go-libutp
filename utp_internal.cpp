@@ -2158,6 +2158,12 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
 		// Incoming connection completion
 		if (pk_flags == ST_DATA && conn->state == CS_SYN_RECV) {
 			conn->state = CS_CONNECTED;
+
+			// Writes are refused until the connection is established, so a user
+			// that wrote on the accepted socket before now is waiting to be told
+			// it can try again. There's no ON_CONNECT for incoming connections,
+			// the accept callback already served that purpose.
+			utp_call_on_state_change(conn->ctx, conn, UTP_STATE_WRITABLE);
 		}
 
 		// Outgoing connection completion
