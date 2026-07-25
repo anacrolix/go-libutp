@@ -17,9 +17,10 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
+    - uses: extractions/setup-just@v2
     - run: go version
-    - run: go test -race -count 2 ./...
-    - run: go test -bench . -run '@' ./...
+    - run: just test
+    - run: just bench
 
   asan:
     timeout-minutes: 30
@@ -34,5 +35,6 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
+    - uses: extractions/setup-just@v2
     - run: go version
-    - run: ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=suppressions=$GITHUB_WORKSPACE/lsan_suppressions.txt go test -tags 'lsan netgo' ./...
+    - run: just asan

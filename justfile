@@ -1,3 +1,7 @@
+# just defaults to `sh`, which isn't reliably on PATH on Windows CI runners;
+# bash always is.
+set windows-shell := ["bash", "-cu"]
+
 default:
     @just --list
 
