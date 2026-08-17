@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Clamp the peer-supplied uTP delay sample before it reaches the average-delay
+  accumulator. A crafted `reply_micro` exactly half the 32-bit space from the
+  baseline previously produced a sample of `-2^31` (or `+2^31-1` on the other
+  branch) that tripped the `current_delay_sum` assertion and aborted the whole
+  process. Reported against Erigon (erigontech/security#78); the same
+  arithmetic is present in upstream bittorrent/libutp.
+- Repair the MTU floor/ceiling range instead of asserting on it. A dropped MTU
+  probe in steady state, or an interface/ICMP-reported MTU below the search
+  floor, could leave `mtu_floor > mtu_ceiling` and abort on
+  `assert(mtu_floor <= mtu_ceiling)` (bittorrent/libutp #105, #130). Both fixes
+  mirror the corresponding handling in libtorrent's uTP implementation.
+
 ## v1.4.0 — 2025-11-21
 
 - Fix unsynchronized event checks and signalling in `waitForConnect`

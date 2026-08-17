@@ -68,6 +68,14 @@
 // considered suspicious and ignored
 #define ACK_NR_ALLOWED_WINDOW DUPLICATE_ACKS_BEFORE_RESEND
 
+// The furthest a single delay sample may sit from the average delay baseline.
+// The samples are wrapping distances over a peer supplied field, so without a
+// bound a peer can pick one that no average over it can represent
+#define MAX_AVERAGE_DELAY_SAMPLE (INT_MAX / 4)
+
+// The smallest MTU we will search down to. Less would not pass TCP
+#define MTU_FLOOR_MIN 576
+
 #define RST_INFO_TIMEOUT 10000
 #define RST_INFO_LIMIT 1000
 // 29 seconds determined from measuring many home NAT devices
@@ -1288,6 +1296,21 @@ void UTPSocket::check_timeouts()
 // this should be called every time we change mtu_floor or mtu_ceiling
 void UTPSocket::mtu_search_update()
 {
+	// the floor can end up above the ceiling: a probe that previously got
+	// through may be dropped once we're in steady state, and an ICMP
+	// fragmentation-needed message can report a next hop MTU below a size we
+	// have already had acked. Neither is our invariant to lose, and neither is
+	// worth aborting the process over, so repair the range and search again
+	// from half way down rather than from the bottom
+	if (mtu_floor > mtu_ceiling) {
+		mtu_ceiling = mtu_floor;
+		mtu_floor = mtu_ceiling > MTU_FLOOR_MIN
+			? (MTU_FLOOR_MIN + mtu_ceiling) / 2
+			: mtu_ceiling;
+		log(UTP_LOG_MTU, "MTU [REDUCING FLOOR] floor:%d ceiling:%d"
+			, mtu_floor, mtu_ceiling);
+	}
+
 	assert(mtu_floor <= mtu_ceiling);
 
 	// binary search
@@ -1314,8 +1337,10 @@ void UTPSocket::mtu_search_update()
 void UTPSocket::mtu_reset()
 {
 	mtu_ceiling = get_udp_mtu();
-	// Less would not pass TCP...
-	mtu_floor = 576;
+	mtu_floor = MTU_FLOOR_MIN;
+	// an interface can report an MTU below the smallest size we would otherwise
+	// search down to. Follow it down rather than inverting the range
+	if (mtu_floor > mtu_ceiling) mtu_floor = mtu_ceiling;
 	log(UTP_LOG_MTU, "MTU [RESET] floor:%d ceiling:%d current:%d"
 		, mtu_floor, mtu_ceiling, mtu_last);
 	assert(mtu_floor <= mtu_ceiling);
@@ -2036,16 +2061,20 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
 		// distance walking from lhs to rhs, upwards
 		const uint32 dist_up = actual_delay - conn->average_delay_base;
 
+		// both distances are derived from reply_micro, which the peer picks
+		// freely, so clamp the sample to the range this average can represent.
+		// At a distance of exactly half the 32 bit space the two distances are
+		// equal, the negative branch is taken and the sample is -2^31, which is
+		// one below the bound asserted further down. A one way delay that far
+		// from the baseline is garbage regardless of intent
 		if (dist_down > dist_up) {
-//			assert(dist_up < INT_MAX / 4);
 			// average_delay_base < actual_delay, we should end up
 			// with a positive sample
-			average_delay_sample = dist_up;
+			average_delay_sample = min<uint32>(dist_up, MAX_AVERAGE_DELAY_SAMPLE);
 		} else {
-//			assert(-int64(dist_down) < INT_MAX / 4);
 			// average_delay_base >= actual_delay, we should end up
 			// with a negative sample
-			average_delay_sample = -int64(dist_down);
+			average_delay_sample = -int64(min<uint32>(dist_down, MAX_AVERAGE_DELAY_SAMPLE));
 		}
 		conn->current_delay_sum += average_delay_sample;
 		++conn->current_delay_samples;
