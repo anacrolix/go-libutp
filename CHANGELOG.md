@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.1 — 2026-08-17
 
 - Clamp the peer-supplied uTP delay sample before it reaches the average-delay
   accumulator. A crafted `reply_micro` exactly half the 32-bit space from the
@@ -13,6 +13,23 @@
   floor, could leave `mtu_floor > mtu_ceiling` and abort on
   `assert(mtu_floor <= mtu_ceiling)` (bittorrent/libutp #105, #130). Both fixes
   mirror the corresponding handling in libtorrent's uTP implementation.
+- Add a `justfile` mirroring the CI jobs, so `just test`, `just bench` and `just asan` run
+  locally exactly what CI runs
+- CI: drive the test, benchmark and asan jobs through the justfile
+- asan: leak checks are now clean on macOS too. Tests under the `lsan` build tag also build with
+  `netgo` to skip the C resolver, and `lsan_suppressions.txt` suppresses the remaining
+  libdispatch/XPC allocations that macOS never frees. Both are inert on Linux.
+
+## v1.5.0 — 2026-07-23
+
+- Add `NewSocketFromPacketConn`, for wrapping an existing `net.PacketConn` (#34)
+- Fix writes hanging on freshly accepted connections. An accepted socket is handed to the accept
+  callback while still in `CS_SYN_RECV` and only becomes writable once the initiator's first data
+  packet arrives, but nothing signalled `UTP_STATE_WRITABLE`, so a `Write` on the accepted `Conn`
+  blocked until the `Conn` was destroyed
+- CI: stop skipping the nettest read timeout test (fixed by the above)
+- CI: quote the benchmark `-run` pattern so Windows works
+- Add `CHANGELOG.md` and link to it from the README
 
 ## v1.4.0 — 2025-11-21
 
