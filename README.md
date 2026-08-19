@@ -96,6 +96,31 @@ an accepted or dialled `Conn` work normally.
   for every incoming connection.
 - `Socket.SetOption` — set the underlying libutp context options directly.
 
+## Pure Go implementation
+
+[`pureutp`](pureutp) is µTP implemented in Go, with no cgo and no C++ compiler. It's a port of the
+same libutp sources vendored here: the state machine, the LEDBAT congestion controller, selective
+acknowledgements and fast resend, the retransmission timers and the MTU search all follow the
+reference implementation, down to the constants they're tuned with.
+
+```go
+import "github.com/anacrolix/go-libutp/pureutp"
+
+s, err := pureutp.NewSocket("udp", ":4242")
+```
+
+Outside the standard library it depends only on `github.com/anacrolix/log`, and it builds for
+every platform Go targets. The API mirrors the one above — `Socket` is a `net.Listener` and a `net.PacketConn`, connections
+are `net.Conn`, non-µTP packets come out of `Socket.ReadFrom` — so the two are mostly
+interchangeable. It passes `golang.org/x/net/nettest`'s `TestConn` conformance suite, and the
+[interop](interop) package tests it against libutp itself: in both directions, in both roles, and
+over a link that drops, delays and duplicates packets.
+
+Two of libutp's inputs aren't available portably from Go. ICMP fragmentation-needed reports aren't
+fed back in, and the don't-fragment bit isn't set on MTU probes, so path MTU is inferred from
+timeouts and duplicate acks rather than reported outright. Neither affects correctness; the search
+just tends to settle high. The cgo package doesn't act on ICMP either.
+
 ## ucat
 
 `cmd/ucat` is a netcat-alike over µTP, handy for smoke-testing:

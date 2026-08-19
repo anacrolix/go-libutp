@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Add `pureutp`, a pure Go implementation of µTP ported from the vendored libutp sources. It needs
+  no cgo and no C++ compiler, and offers the same API shape as the wrapper: `Socket` implements
+  `net.Listener` and `net.PacketConn`, and its connections implement `net.Conn`. The state
+  machine, LEDBAT congestion control, selective acknowledgements and fast resend, retransmission
+  timers and MTU search follow libutp closely, including its constants
+- Add `interop`, which tests `pureutp` against libutp on the wire: both directions, both roles,
+  bidirectional transfers, ping-pong, and transfers over a link that drops, delays and duplicates
+  packets. `pureutp` also passes `nettest.TestConn`
+
 ## v1.5.1 — 2026-08-17
 
 - Clamp the peer-supplied uTP delay sample before it reaches the average-delay
