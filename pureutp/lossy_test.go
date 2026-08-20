@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 // lossyPacketConn drops, duplicates and delays outgoing packets, so that retransmission, the
@@ -84,14 +83,14 @@ func TestTransferOverLossyNetwork(t *testing.T) {
 		t.SkipNow()
 	}
 	pc1, err := net.ListenPacket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	pc2, err := net.ListenPacket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	s1, err := NewSocketFromPacketConn(newLossyPacketConn(pc1, 1, 5, 2, 5))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s1.Close()
 	s2, err := NewSocketFromPacketConn(newLossyPacketConn(pc2, 2, 5, 2, 5))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s2.Close()
 
 	accepts := make(chan net.Conn, 1)
@@ -104,15 +103,15 @@ func TestTransferOverLossyNetwork(t *testing.T) {
 		accepts <- c
 	}()
 	c1, err := s1.Dial(s2.Addr().String())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c1.Close()
 	c2, ok := <-accepts
-	require.True(t, ok)
+	qt.Assert(t, qt.IsTrue(ok))
 	defer c2.Close()
 
 	want := make([]byte, 256<<10)
 	_, err = cryptorand.Read(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	type result struct {
 		b   []byte
@@ -123,29 +122,29 @@ func TestTransferOverLossyNetwork(t *testing.T) {
 		b, err := io.ReadAll(c2)
 		reads <- result{b, err}
 	}()
-	require.NoError(t, c1.SetWriteDeadline(time.Now().Add(120*time.Second)))
+	qt.Assert(t, qt.IsNil(c1.SetWriteDeadline(time.Now().Add(120*time.Second))))
 	_, err = c1.Write(want)
-	require.NoError(t, err)
-	require.NoError(t, c1.Close())
-	require.NoError(t, c2.SetReadDeadline(time.Now().Add(120*time.Second)))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(c1.Close()))
+	qt.Assert(t, qt.IsNil(c2.SetReadDeadline(time.Now().Add(120*time.Second))))
 	got := <-reads
-	require.NoError(t, got.err)
-	require.Equal(t, len(want), len(got.b))
-	assert.True(t, bytes.Equal(want, got.b))
+	qt.Assert(t, qt.IsNil(got.err))
+	qt.Assert(t, qt.Equals(len(got.b), len(want)))
+	qt.Check(t, qt.IsTrue(bytes.Equal(want, got.b)), qt.Commentf("payload differs"))
 }
 
 // A lost syn-ack has to be recoverable: the peer asks again with another SYN, and the answer has
 // to come back, or an accepted connection is stranded until the dialer gives up.
 func TestSynAckLostThenRecovered(t *testing.T) {
 	acceptorPc, err := net.ListenPacket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	// Drop the first two packets the acceptor sends, which are its first two syn-acks.
 	gated := &dropFirstN{PacketConn: acceptorPc, n: 2}
 	acceptor, err := NewSocketFromPacketConn(gated)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer acceptor.Close()
 	dialer, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer dialer.Close()
 
 	accepts := make(chan net.Conn, 1)
@@ -158,20 +157,20 @@ func TestSynAckLostThenRecovered(t *testing.T) {
 		accepts <- c
 	}()
 	c1, err := dialer.DialTimeout(acceptor.Addr().String(), 30*time.Second)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c1.Close()
 	c2, ok := <-accepts
-	require.True(t, ok)
+	qt.Assert(t, qt.IsTrue(ok))
 	defer c2.Close()
 
-	require.NoError(t, c1.SetDeadline(time.Now().Add(30*time.Second)))
-	require.NoError(t, c2.SetDeadline(time.Now().Add(30*time.Second)))
+	qt.Assert(t, qt.IsNil(c1.SetDeadline(time.Now().Add(30*time.Second))))
+	qt.Assert(t, qt.IsNil(c2.SetDeadline(time.Now().Add(30*time.Second))))
 	_, err = io.WriteString(c1, "made it")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	b := make([]byte, 7)
 	_, err = io.ReadFull(c2, b)
-	require.NoError(t, err)
-	assert.Equal(t, "made it", string(b))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(b), "made it"))
 }
 
 type dropFirstN struct {

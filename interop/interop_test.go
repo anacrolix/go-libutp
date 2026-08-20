@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 
 	utp "github.com/anacrolix/go-libutp"
 	"github.com/anacrolix/go-libutp/pureutp"
@@ -28,7 +27,7 @@ type socket interface {
 func newLibutpSocket(t *testing.T) socket {
 	t.Helper()
 	s, err := utp.NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(func() { s.Close() })
 	return s
 }
@@ -36,7 +35,7 @@ func newLibutpSocket(t *testing.T) socket {
 func newPureSocket(t *testing.T) socket {
 	t.Helper()
 	s, err := pureutp.NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(func() { s.Close() })
 	return s
 }
@@ -54,10 +53,10 @@ func connect(t *testing.T, dialer, acceptor socket) (dialed, accepted net.Conn) 
 		accepts <- result{c, err}
 	}()
 	dialed, err := dialer.Dial(acceptor.Addr().String())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(func() { dialed.Close() })
 	r := <-accepts
-	require.NoError(t, r.err)
+	qt.Assert(t, qt.IsNil(r.err))
 	t.Cleanup(func() { r.c.Close() })
 	return dialed, r.c
 }
@@ -67,7 +66,7 @@ func transfer(t *testing.T, w, r net.Conn, n int) {
 	t.Helper()
 	want := make([]byte, n)
 	_, err := rand.Read(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	type result struct {
 		b   []byte
@@ -78,17 +77,17 @@ func transfer(t *testing.T, w, r net.Conn, n int) {
 		b, err := io.ReadAll(r)
 		reads <- result{b, err}
 	}()
-	require.NoError(t, w.SetWriteDeadline(time.Now().Add(60*time.Second)))
+	qt.Assert(t, qt.IsNil(w.SetWriteDeadline(time.Now().Add(60*time.Second))))
 	_, err = w.Write(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	// Closing sends a FIN, which is what turns into EOF at the other end.
-	require.NoError(t, w.Close())
+	qt.Assert(t, qt.IsNil(w.Close()))
 
-	require.NoError(t, r.SetReadDeadline(time.Now().Add(60*time.Second)))
+	qt.Assert(t, qt.IsNil(r.SetReadDeadline(time.Now().Add(60*time.Second))))
 	got := <-reads
-	require.NoError(t, got.err)
-	require.Equal(t, len(want), len(got.b))
-	assert.True(t, bytes.Equal(want, got.b), "payload differs")
+	qt.Assert(t, qt.IsNil(got.err))
+	qt.Assert(t, qt.Equals(len(got.b), len(want)))
+	qt.Check(t, qt.IsTrue(bytes.Equal(want, got.b)), qt.Commentf("payload differs"))
 }
 
 const transferSize = 1 << 20
@@ -120,7 +119,7 @@ func transferNoClose(t *testing.T, w, r net.Conn, n int) {
 	t.Helper()
 	want := make([]byte, n)
 	_, err := rand.Read(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	type result struct {
 		b   []byte
@@ -132,13 +131,13 @@ func transferNoClose(t *testing.T, w, r net.Conn, n int) {
 		_, err := io.ReadFull(r, b)
 		reads <- result{b, err}
 	}()
-	require.NoError(t, w.SetWriteDeadline(time.Now().Add(60*time.Second)))
-	require.NoError(t, r.SetReadDeadline(time.Now().Add(60*time.Second)))
+	qt.Assert(t, qt.IsNil(w.SetWriteDeadline(time.Now().Add(60*time.Second))))
+	qt.Assert(t, qt.IsNil(r.SetReadDeadline(time.Now().Add(60*time.Second))))
 	_, err = w.Write(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	got := <-reads
-	require.NoError(t, got.err)
-	assert.True(t, bytes.Equal(want, got.b), "payload differs")
+	qt.Assert(t, qt.IsNil(got.err))
+	qt.Check(t, qt.IsTrue(bytes.Equal(want, got.b)), qt.Commentf("payload differs"))
 }
 
 // Both directions at once, so acks ride along with data rather than arriving as state packets.
@@ -175,21 +174,21 @@ func TestPingPong(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dialed, accepted := connect(t, c.dialer(t), c.acceptor(t))
-			require.NoError(t, dialed.SetDeadline(time.Now().Add(30*time.Second)))
-			require.NoError(t, accepted.SetDeadline(time.Now().Add(30*time.Second)))
+			qt.Assert(t, qt.IsNil(dialed.SetDeadline(time.Now().Add(30*time.Second))))
+			qt.Assert(t, qt.IsNil(accepted.SetDeadline(time.Now().Add(30*time.Second))))
 			for i := 0; i < 20; i++ {
 				_, err := io.WriteString(dialed, "ping")
-				require.NoError(t, err)
+				qt.Assert(t, qt.IsNil(err))
 				b := make([]byte, 4)
 				_, err = io.ReadFull(accepted, b)
-				require.NoError(t, err)
-				require.Equal(t, "ping", string(b))
+				qt.Assert(t, qt.IsNil(err))
+				qt.Assert(t, qt.Equals(string(b), "ping"))
 
 				_, err = io.WriteString(accepted, "pong")
-				require.NoError(t, err)
+				qt.Assert(t, qt.IsNil(err))
 				_, err = io.ReadFull(dialed, b)
-				require.NoError(t, err)
-				require.Equal(t, "pong", string(b))
+				qt.Assert(t, qt.IsNil(err))
+				qt.Assert(t, qt.Equals(string(b), "pong"))
 			}
 		})
 	}

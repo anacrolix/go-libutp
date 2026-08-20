@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 
 	utp "github.com/anacrolix/go-libutp"
 	"github.com/anacrolix/go-libutp/pureutp"
@@ -75,14 +74,14 @@ func (me *lossyPacketConn) Close() error {
 func newLossyPacketConn(t *testing.T, seed uint64) net.PacketConn {
 	t.Helper()
 	pc, err := net.ListenPacket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	return &lossyPacketConn{PacketConn: pc, r: rand.New(rand.NewPCG(seed, seed*2+1))}
 }
 
 func newLossyLibutpSocket(t *testing.T, seed uint64) socket {
 	t.Helper()
 	s, err := utp.NewSocketFromPacketConn(newLossyPacketConn(t, seed))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(func() { s.Close() })
 	return s
 }
@@ -90,7 +89,7 @@ func newLossyLibutpSocket(t *testing.T, seed uint64) socket {
 func newLossyPureSocket(t *testing.T, seed uint64) socket {
 	t.Helper()
 	s, err := pureutp.NewSocketFromPacketConn(newLossyPacketConn(t, seed))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(func() { s.Close() })
 	return s
 }
@@ -99,7 +98,7 @@ func testLossyTransfer(t *testing.T, dialer, acceptor socket) {
 	dialed, accepted := connect(t, dialer, acceptor)
 	want := make([]byte, 128<<10)
 	_, err := cryptorand.Read(want)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	type result struct {
 		b   []byte
@@ -110,15 +109,15 @@ func testLossyTransfer(t *testing.T, dialer, acceptor socket) {
 		b, err := io.ReadAll(accepted)
 		reads <- result{b, err}
 	}()
-	require.NoError(t, dialed.SetWriteDeadline(time.Now().Add(120*time.Second)))
+	qt.Assert(t, qt.IsNil(dialed.SetWriteDeadline(time.Now().Add(120*time.Second))))
 	_, err = dialed.Write(want)
-	require.NoError(t, err)
-	require.NoError(t, dialed.Close())
-	require.NoError(t, accepted.SetReadDeadline(time.Now().Add(120*time.Second)))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(dialed.Close()))
+	qt.Assert(t, qt.IsNil(accepted.SetReadDeadline(time.Now().Add(120*time.Second))))
 	got := <-reads
-	require.NoError(t, got.err)
-	require.Equal(t, len(want), len(got.b))
-	assert.True(t, bytes.Equal(want, got.b), "payload differs")
+	qt.Assert(t, qt.IsNil(got.err))
+	qt.Assert(t, qt.Equals(len(got.b), len(want)))
+	qt.Check(t, qt.IsTrue(bytes.Equal(want, got.b)), qt.Commentf("payload differs"))
 }
 
 func TestLossyPureDialsLibutp(t *testing.T) {
