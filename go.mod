@@ -13,6 +13,7 @@ require (
 	github.com/anacrolix/tagflag v1.1.0
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8
 	github.com/frankban/quicktest v1.14.6
+	github.com/go-quicktest/qt v1.102.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.47.0
 )
@@ -27,7 +28,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
