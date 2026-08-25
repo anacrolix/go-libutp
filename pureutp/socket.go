@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"math/rand/v2"
 	"net"
 	"sync"
 	"time"
-
-	"github.com/anacrolix/log"
 )
 
 const (
@@ -93,7 +92,7 @@ type Socket struct {
 	firewallCallback FirewallCallback
 	resolveAddr      AddrResolver
 
-	logger    log.Logger
+	logger    *slog.Logger
 	logLevels [numLogLevels]bool
 }
 
@@ -113,8 +112,8 @@ type nonUtpPacket struct {
 // NewSocketOpt configures a Socket at construction.
 type NewSocketOpt func(s *Socket)
 
-// WithLogger gives a Socket its own logger instead of the package level Logger.
-func WithLogger(l log.Logger) NewSocketOpt {
+// WithLogger gives a Socket its own logger instead of the package level [Logger].
+func WithLogger(l *slog.Logger) NewSocketOpt {
 	return func(s *Socket) { s.logger = l }
 }
 
@@ -164,12 +163,14 @@ func NewSocketFromPacketConn(pc net.PacketConn, opts ...NewSocketOpt) (*Socket, 
 		targetDelay: defaultTargetDelay,
 		optSndBuf:   defaultBufferSize,
 		optRcvBuf:   defaultBufferSize,
-		logger:      Logger,
 		resolveAddr: func(network, addr string) (net.Addr, error) { return net.ResolveUDPAddr(network, addr) },
 	}
 	s.nonUtpReadCond.L = &s.mu
 	for _, opt := range opts {
 		opt(s)
+	}
+	if s.logger == nil {
+		s.logger = defaultLogger()
 	}
 	s.currentMS = nowMillis()
 	s.ackTimer = time.AfterFunc(math.MaxInt64, s.ackTimerFunc)
@@ -187,15 +188,19 @@ func (s *Socket) broadcastReaders() {
 	s.nonUtpReadCond.Broadcast()
 }
 
+// Logs one of the categories [Socket.SetLogging] turns on. The messages are formatted the way
+// libutp formats its own, so that logs from the two implementations can be read side by side.
 func (s *Socket) logf(level logLevel, format string, args ...any) {
 	if !s.logLevels[level] {
 		return
 	}
-	s.logger.Printf(format, args...)
+	s.logger.Debug(fmt.Sprintf(format, args...), "category", level)
 }
 
-// SetLogging enables or disables one of the log categories libutp distinguishes. All are off by
-// default.
+// SetLogging enables or disables the log categories libutp distinguishes: normal covers the
+// connection lifecycle and packet loss, mtu the path MTU search, and debug every packet. All are
+// off by default. They're logged at debug level, so the Socket's logger has to be passing debug
+// records for them to appear.
 func (s *Socket) SetLogging(normal, mtu, debug bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -240,10 +245,11 @@ func (s *Socket) reader() {
 			if closed {
 				return
 			}
-			s.logger.Printf("ignoring socket read error: %s", err)
+			s.logger.Warn("ignoring socket read error", "err", err)
 			consecutiveErrors++
 			if consecutiveErrors >= 100 {
-				s.logger.Print("too many consecutive errors, closing socket")
+				s.logger.Error("too many consecutive errors, closing socket",
+					"errors", consecutiveErrors)
 				s.Close()
 				return
 			}

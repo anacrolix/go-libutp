@@ -31,7 +31,8 @@
 // [net.PacketConn] obtained elsewhere; if that PacketConn doesn't use UDP addresses, pass
 // [WithAddrResolver] so Dial knows how to turn an address string into one it accepts.
 //
-// Outside of the standard library the package depends only on github.com/anacrolix/log, and it
+// Nothing outside the standard library is imported, logging included: a Socket logs to a
+// [log/slog.Logger], its own if [WithLogger] gave it one and otherwise slog's default. The package
 // builds for every platform Go does.
 //
 // # Differences from libutp

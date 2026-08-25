@@ -1,11 +1,20 @@
 package utp
 
-import "github.com/anacrolix/log"
+import "log/slog"
 
 const (
 	logCallbacks = false
 	utpLogging   = false
 )
 
-// The default Socket Logger. Override per Socket by using WithLogger with NewSocket.
-var Logger = log.Default.WithContextText("go-libutp")
+// Logger is the logger a Socket is given when [NewSocket] isn't passed [WithLogger]. When it's
+// nil, which is the default, a Socket uses slog.Default() as it stands when the Socket is created.
+var Logger *slog.Logger
+
+// The logger for a Socket created without one of its own.
+func defaultLogger() *slog.Logger {
+	if Logger != nil {
+		return Logger
+	}
+	return slog.Default()
+}

@@ -4,7 +4,6 @@ go 1.24.0
 
 require (
 	github.com/anacrolix/envpprof v1.1.0
-	github.com/anacrolix/log v0.13.1
 	github.com/anacrolix/lsan v0.0.0-20211126052245-807000409a62
 	github.com/anacrolix/missinggo v1.2.1
 	github.com/anacrolix/missinggo/v2 v2.10.0
@@ -19,6 +18,7 @@ require (
 )
 
 require (
+	github.com/anacrolix/log v0.13.1 // indirect
 	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect

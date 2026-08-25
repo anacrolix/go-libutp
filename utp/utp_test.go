@@ -2,9 +2,12 @@ package utp
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"sync"
 	"testing"
@@ -200,4 +203,54 @@ func TestSetLogging(t *testing.T) {
 	defer s.Close()
 	s.SetLogging(true, true, true)
 	s.SetLogging(false, false, false)
+}
+
+// Collects everything logged to it, so a test can see what a Socket had to say.
+type captureHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (me *captureHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (me *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	me.mu.Lock()
+	defer me.mu.Unlock()
+	me.records = append(me.records, r.Clone())
+	return nil
+}
+
+func (me *captureHandler) WithAttrs([]slog.Attr) slog.Handler { return me }
+func (me *captureHandler) WithGroup(string) slog.Handler      { return me }
+
+func (me *captureHandler) len() int {
+	me.mu.Lock()
+	defer me.mu.Unlock()
+	return len(me.records)
+}
+
+// A PacketConn that can't send, so that a Socket over it has something to report.
+type unsendablePacketConn struct {
+	net.PacketConn
+}
+
+func (me unsendablePacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	return 0, errors.New("this conn doesn't send")
+}
+
+// What a Socket logs goes to the logger WithLogger gave it, on either implementation.
+func TestWithLogger(t *testing.T) {
+	h := new(captureHandler)
+	pc, err := net.ListenPacket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	s, err := NewSocketFromPacketConn(unsendablePacketConn{pc}, WithLogger(slog.New(h)))
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	// pureutp reports a failed send under its normal category; libutp reports it regardless.
+	s.SetLogging(true, true, true)
+	// The dial's syn is a send, and every send on this Socket fails, so the dial can only time
+	// out. It's what it logs on the way there that this is about.
+	_, err = s.DialTimeout(s.Addr().String(), time.Second)
+	qt.Check(t, qt.IsNotNil(err))
+	qt.Check(t, qt.IsTrue(h.len() > 0), qt.Commentf("nothing reached the logger"))
 }

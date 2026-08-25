@@ -157,7 +157,7 @@ func TestConnectConnAfterSocketClose(t *testing.T) {
 func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 	mu.Lock()
 	for len(s.conns) != l {
-		s.logger.Printf("%v has %v conns (waiting for %v)", s, len(s.conns), l)
+		s.logger.Info("waiting for conns to close", "socket", s, "conns", len(s.conns), "want", l)
 		mu.Unlock()
 		time.Sleep(time.Second)
 		mu.Lock()
@@ -175,7 +175,7 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 		c.Close()
 		go func() {
 			c, err := s.Accept()
-			s.logger.Printf("accepted: %v", err)
+			s.logger.Info("accepted", "err", err)
 			c.Close()
 		}()
 	}

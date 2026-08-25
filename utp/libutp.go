@@ -71,7 +71,7 @@ func boolOption(b bool) int {
 func newLibutpSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	o := newOptions(opts)
 	var lopts []libutp.NewSocketOpt
-	if o.hasLogger {
+	if o.logger != nil {
 		lopts = append(lopts, libutp.WithLogger(o.logger))
 	}
 	s, err := libutp.NewSocketFromPacketConn(pc, lopts...)

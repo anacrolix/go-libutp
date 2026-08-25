@@ -29,7 +29,7 @@ func (me pureSocket) SetFirewallCallback(f FirewallCallback) {
 func newPureSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	o := newOptions(opts)
 	var popts []pureutp.NewSocketOpt
-	if o.hasLogger {
+	if o.logger != nil {
 		popts = append(popts, pureutp.WithLogger(o.logger))
 	}
 	if o.targetDelay != 0 {

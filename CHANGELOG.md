@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Breaking**: log through `log/slog`. `Logger`, `WithLogger` and the `utp` package's
+  `WithLogger` option now take a `*slog.Logger` instead of an `anacrolix/log.Logger`. The
+  package-level `Logger` in both implementations starts out nil, which means a Socket created
+  without `WithLogger` logs to `slog.Default()` as it stands when the Socket is created. Records
+  carry attributes rather than formatted values, and go out at a level that suits them: read
+  errors at warn, giving up on a socket at error, and everything else at debug. The categories
+  `Socket.SetLogging` turns on are logged at debug, with a `category` attribute, and keep their
+  libutp-shaped message text so the two implementations' logs can still be read side by side.
+  `pureutp` now imports nothing outside the standard library
 - Add `pureutp`, a pure Go implementation of µTP ported from the vendored libutp sources. It needs
   no cgo and no C++ compiler, and offers the same API shape as the wrapper: `Socket` implements
   `net.Listener` and `net.PacketConn`, and its connections implement `net.Conn`. The state

@@ -22,10 +22,9 @@ package utp
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"time"
-
-	"github.com/anacrolix/log"
 )
 
 // An Implementation makes Sockets over a PacketConn. The two in this module are [Pure] and
@@ -82,17 +81,17 @@ type Socket interface {
 	SetWriteBufferLen(int)
 
 	// SetLogging turns the protocol's own log categories on and off. They go to the Socket's
-	// logger, are all off by default, and are noisy: normal covers connection lifecycle and
-	// packet loss, mtu the path MTU search, and debug every packet. libutp compiles its debug
-	// logging out, so debug does nothing there.
+	// logger at debug level, so it has to be passing debug records for them to appear. All are
+	// off by default, and they're noisy: normal covers connection lifecycle and packet loss, mtu
+	// the path MTU search, and debug every packet. libutp compiles its debug logging out, so
+	// debug does nothing there.
 	SetLogging(normal, mtu, debug bool)
 }
 
 // The options both implementations have in common. Anything left zero is left at the
 // implementation's own default.
 type options struct {
-	logger        log.Logger
-	hasLogger     bool
+	logger        *slog.Logger
 	sendBuffer    int
 	receiveBuffer int
 	targetDelay   time.Duration
@@ -102,13 +101,13 @@ type options struct {
 type Option func(*options)
 
 // WithLogger gives a Socket its own logger, instead of the implementation's package level one:
-// [github.com/anacrolix/go-libutp.Logger] or [github.com/anacrolix/go-libutp/pureutp.Logger].
-// This is the logger the categories in [Socket.SetLogging] write to, along with anything either
-// implementation has to report about the socket itself.
-func WithLogger(l log.Logger) Option {
+// [github.com/anacrolix/go-libutp.Logger] or [github.com/anacrolix/go-libutp/pureutp.Logger],
+// either of which is slog's default until it's set. This is the logger the categories in
+// [Socket.SetLogging] write to, along with anything either implementation has to report about the
+// socket itself.
+func WithLogger(l *slog.Logger) Option {
 	return func(o *options) {
 		o.logger = l
-		o.hasLogger = true
 	}
 }
 

@@ -89,7 +89,8 @@ an accepted or dialled `Conn` work normally.
 ### Options
 
 - `utp.WithLogger(l)` — pass to `NewSocket`/`NewSocketFromPacketConn` to give a socket its own
-  logger, instead of the package-level `utp.Logger`.
+  `*slog.Logger`, instead of the package-level `utp.Logger`. That one is nil until you set it,
+  which means sockets log to `slog.Default()`.
 - `Socket.SetFirewallCallback` and `Socket.SetSyncFirewallCallback` — reject incoming connections
   before they're acknowledged, so the peer sees no response at all rather than an accept followed
   by a close. Prefer the synchronous variant; it's called under the package lock and is consulted
@@ -109,8 +110,8 @@ import "github.com/anacrolix/go-libutp/pureutp"
 s, err := pureutp.NewSocket("udp", ":4242")
 ```
 
-Outside the standard library it depends only on `github.com/anacrolix/log`, and it builds for
-every platform Go targets. The API mirrors the one above — `Socket` is a `net.Listener` and a `net.PacketConn`, connections
+It imports nothing outside the standard library, logging included, and it builds for every
+platform Go targets. The API mirrors the one above — `Socket` is a `net.Listener` and a `net.PacketConn`, connections
 are `net.Conn`, non-µTP packets come out of `Socket.ReadFrom` — so the two are mostly
 interchangeable. It passes `golang.org/x/net/nettest`'s `TestConn` conformance suite, and the
 [interop](interop) package tests it against libutp itself: in both directions, in both roles, and
