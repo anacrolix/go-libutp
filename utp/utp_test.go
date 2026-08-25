@@ -1,0 +1,196 @@
+package utp
+
+import (
+	"bytes"
+	"crypto/rand"
+	"io"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/go-quicktest/qt"
+)
+
+// Dials a Socket from itself, which is the cheapest way to get a connected pair.
+func connPair(t *testing.T, s Socket) (dialed, accepted net.Conn) {
+	t.Helper()
+	var wg sync.WaitGroup
+	var dialErr, acceptErr error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		dialed, dialErr = s.Dial(s.Addr().String())
+	}()
+	go func() {
+		defer wg.Done()
+		accepted, acceptErr = s.Accept()
+	}()
+	wg.Wait()
+	qt.Assert(t, qt.IsNil(dialErr))
+	qt.Assert(t, qt.IsNil(acceptErr))
+	t.Cleanup(func() {
+		dialed.Close()
+		accepted.Close()
+	})
+	return
+}
+
+// Whichever implementation the build selected has to carry a stream intact.
+func TestSelectedImplementationTransfers(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	c1, c2 := connPair(t, s)
+
+	want := make([]byte, 1<<19)
+	_, err = rand.Read(want)
+	qt.Assert(t, qt.IsNil(err))
+	reads := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(c2)
+		reads <- b
+	}()
+	qt.Assert(t, qt.IsNil(c1.SetWriteDeadline(time.Now().Add(60*time.Second))))
+	_, err = c1.Write(want)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(c1.Close()))
+	got := <-reads
+	qt.Assert(t, qt.Equals(len(got), len(want)))
+	qt.Check(t, qt.IsTrue(bytes.Equal(want, got)), qt.Commentf("payload differs"))
+}
+
+// A Socket is a listener and a packet conn whichever implementation is underneath, and the
+// connections it hands out honour deadlines.
+func TestInterfacesSatisfied(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	var _ net.Listener = s
+	var _ net.PacketConn = s
+	qt.Check(t, qt.Equals(s.Addr().Network(), "udp"))
+	qt.Check(t, qt.Equals(s.LocalAddr().String(), s.Addr().String()))
+
+	c1, _ := connPair(t, s)
+	qt.Assert(t, qt.IsNil(c1.SetReadDeadline(time.Now().Add(50*time.Millisecond))))
+	_, err = c1.Read(make([]byte, 1))
+	var nerr net.Error
+	qt.Assert(t, qt.ErrorAs(err, &nerr))
+	qt.Check(t, qt.IsTrue(nerr.Timeout()))
+}
+
+// Datagrams that aren't µTP reach ReadFrom, so the port can be shared.
+func TestNonUtpPassthrough(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	other, err := net.ListenPacket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer other.Close()
+	_, err = other.WriteTo([]byte("not uTP at all"), s.Addr())
+	qt.Assert(t, qt.IsNil(err))
+
+	// libutp's Socket has no deadlines, so read on a goroutine and give up by other means.
+	type read struct {
+		b    []byte
+		from net.Addr
+	}
+	reads := make(chan read, 1)
+	go func() {
+		b := make([]byte, 64)
+		n, from, err := s.ReadFrom(b)
+		if err == nil {
+			reads <- read{b[:n], from}
+		}
+	}()
+	select {
+	case got := <-reads:
+		qt.Check(t, qt.Equals(string(got.b), "not uTP at all"))
+		qt.Check(t, qt.Equals(got.from.String(), other.LocalAddr().String()))
+	case <-time.After(30 * time.Second):
+		t.Fatal("non-uTP datagram never arrived")
+	}
+}
+
+func TestBufferSizeOptions(t *testing.T) {
+	const send, receive = 128 << 10, 96 << 10
+	s, err := NewSocket("udp", "localhost:0", WithBufferSizes(send, receive))
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	qt.Check(t, qt.Equals(s.WriteBufferLen(), send))
+	qt.Check(t, qt.Equals(s.ReadBufferLen(), receive))
+	s.SetWriteBufferLen(send * 2)
+	s.SetReadBufferLen(receive * 2)
+	qt.Check(t, qt.Equals(s.WriteBufferLen(), send*2))
+	qt.Check(t, qt.Equals(s.ReadBufferLen(), receive*2))
+}
+
+// A firewall callback that rejects everything means the peer gets no answer at all, so the dial
+// times out rather than being refused.
+func TestFirewallCallback(t *testing.T) {
+	acceptor, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer acceptor.Close()
+	var mu sync.Mutex
+	var asked int
+	acceptor.SetFirewallCallback(func(net.Addr) bool {
+		mu.Lock()
+		asked++
+		mu.Unlock()
+		return true
+	})
+	dialer, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer dialer.Close()
+
+	_, err = dialer.DialTimeout(acceptor.Addr().String(), 2*time.Second)
+	qt.Check(t, qt.IsNotNil(err))
+	mu.Lock()
+	defer mu.Unlock()
+	qt.Check(t, qt.IsTrue(asked > 0), qt.Commentf("firewall callback was never consulted"))
+}
+
+// Pure is available whatever the build selected, and an Implementation is a value that can be
+// passed around and used without knowing which one it is.
+func TestPureAlwaysAvailable(t *testing.T) {
+	var impl Implementation = Pure
+	qt.Check(t, qt.Equals(impl.Name(), "pureutp"))
+	s, err := impl.NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	qt.Check(t, qt.IsNil(s.SetReadDeadline(time.Now().Add(time.Hour))))
+}
+
+// NewSocket is Default.NewSocket, and NewSocketFromPacketConn takes a PacketConn the caller
+// already owns.
+func TestDefaultAndPackageFunctions(t *testing.T) {
+	qt.Assert(t, qt.IsNotNil(Default))
+	qt.Check(t, qt.IsTrue(Default.Name() == "libutp" || Default.Name() == "pureutp"),
+		qt.Commentf("unexpected implementation %q", Default.Name()))
+
+	pc, err := net.ListenPacket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	s, err := NewSocketFromPacketConn(pc)
+	qt.Assert(t, qt.IsNil(err))
+	// The Socket owns the PacketConn now, including its port.
+	qt.Check(t, qt.Equals(s.Addr().String(), pc.LocalAddr().String()))
+	qt.Assert(t, qt.IsNil(s.Close()))
+}
+
+// A network the implementations don't listen on has to fail rather than panic, and must not leak
+// the PacketConn when the Socket can't be built.
+func TestNewSocketBadNetwork(t *testing.T) {
+	_, err := NewSocket("tcp", "localhost:0")
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+// Turning the protocol log categories on and off works on either implementation. There's nothing
+// to observe without capturing the logger, so this is a smoke test that neither panics or
+// rejects it.
+func TestSetLogging(t *testing.T) {
+	s, err := NewSocket("udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	s.SetLogging(true, true, true)
+	s.SetLogging(false, false, false)
+}

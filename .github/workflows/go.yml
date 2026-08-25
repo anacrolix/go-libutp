@@ -22,6 +22,23 @@ jobs:
     - run: just test
     - run: just bench
 
+  purego:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ 'stable', 'oldstable' ]
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v6
+      with:
+        go-version: ${{ matrix.go-version }}
+    - uses: extractions/setup-just@v2
+    - run: go version
+    - run: just test-purego
+    - run: just test-nocgo
+
   asan:
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}

@@ -1,9 +1,8 @@
+//go:build cgo && !purego
+
 package interop
 
 import (
-	"bytes"
-	cryptorand "crypto/rand"
-	"io"
 	"math/rand/v2"
 	"net"
 	"sync"
@@ -12,8 +11,15 @@ import (
 
 	"github.com/go-quicktest/qt"
 
-	utp "github.com/anacrolix/go-libutp"
-	"github.com/anacrolix/go-libutp/pureutp"
+	"github.com/anacrolix/go-libutp/utp"
+)
+
+// How often, as a percentage, a packet is dropped outright and how often it's held back to arrive
+// out of order. Enough to make both implementations work for it, low enough that libutp's sender,
+// which backs off hard, still finishes quickly.
+const (
+	lossyDropPct  = 5
+	lossyDelayPct = 5
 )
 
 // Drops and delays outgoing packets, so the two implementations have to agree about
@@ -31,14 +37,6 @@ func (me *lossyPacketConn) roll() int {
 	defer me.mu.Unlock()
 	return me.r.IntN(100)
 }
-
-// How often, as a percentage, a packet is dropped outright and how often it's held back to arrive
-// out of order. Enough to make both implementations work for it, low enough that libutp's sender,
-// which backs off hard, still finishes quickly.
-const (
-	lossyDropPct  = 5
-	lossyDelayPct = 5
-)
 
 func (me *lossyPacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	if me.roll() < lossyDropPct {
@@ -71,65 +69,31 @@ func (me *lossyPacketConn) Close() error {
 	return err
 }
 
-func newLossyPacketConn(t *testing.T, seed uint64) net.PacketConn {
+// Listens on a fresh loopback port that mistreats the packets it sends. seed picks the pattern,
+// so the two ends of a test misbehave differently but repeatably.
+func lossySocket(t *testing.T, impl utp.Implementation, seed uint64) utp.Socket {
 	t.Helper()
-	pc, err := net.ListenPacket("udp", "localhost:0")
+	pc, err := net.ListenPacket("udp", localhost)
 	qt.Assert(t, qt.IsNil(err))
-	return &lossyPacketConn{PacketConn: pc, r: rand.New(rand.NewPCG(seed, seed*2+1))}
-}
-
-func newLossyLibutpSocket(t *testing.T, seed uint64) socket {
-	t.Helper()
-	s, err := utp.NewSocketFromPacketConn(newLossyPacketConn(t, seed))
-	qt.Assert(t, qt.IsNil(err))
+	s, err := impl.NewSocketFromPacketConn(&lossyPacketConn{
+		PacketConn: pc,
+		r:          rand.New(rand.NewPCG(seed, seed*2+1)),
+	})
+	qt.Assert(t, qt.IsNil(err), qt.Commentf("%v", impl))
 	t.Cleanup(func() { s.Close() })
 	return s
 }
 
-func newLossyPureSocket(t *testing.T, seed uint64) socket {
-	t.Helper()
-	s, err := pureutp.NewSocketFromPacketConn(newLossyPacketConn(t, seed))
-	qt.Assert(t, qt.IsNil(err))
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
-func testLossyTransfer(t *testing.T, dialer, acceptor socket) {
-	dialed, accepted := connect(t, dialer, acceptor)
-	want := make([]byte, 128<<10)
-	_, err := cryptorand.Read(want)
-	qt.Assert(t, qt.IsNil(err))
-
-	type result struct {
-		b   []byte
-		err error
-	}
-	reads := make(chan result, 1)
-	go func() {
-		b, err := io.ReadAll(accepted)
-		reads <- result{b, err}
-	}()
-	qt.Assert(t, qt.IsNil(dialed.SetWriteDeadline(time.Now().Add(120*time.Second))))
-	_, err = dialed.Write(want)
-	qt.Assert(t, qt.IsNil(err))
-	qt.Assert(t, qt.IsNil(dialed.Close()))
-	qt.Assert(t, qt.IsNil(accepted.SetReadDeadline(time.Now().Add(120*time.Second))))
-	got := <-reads
-	qt.Assert(t, qt.IsNil(got.err))
-	qt.Assert(t, qt.Equals(len(got.b), len(want)))
-	qt.Check(t, qt.IsTrue(bytes.Equal(want, got.b)), qt.Commentf("payload differs"))
-}
-
-func TestLossyPureDialsLibutp(t *testing.T) {
+// Both ends have to recover everything they send over a link that loses and reorders it,
+// whichever implementation is at each end.
+func TestLossyTransfer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testLossyTransfer(t, newLossyPureSocket(t, 1), newLossyLibutpSocket(t, 2))
-}
-
-func TestLossyLibutpDialsPure(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	testLossyTransfer(t, newLossyLibutpSocket(t, 3), newLossyPureSocket(t, 4))
+	forEachPair(t, func(t *testing.T, dialer, acceptor utp.Implementation) {
+		dialed, accepted := connect(t, lossySocket(t, dialer, 1), lossySocket(t, acceptor, 2))
+		// Deliberately modest: recovery under loss is what's being checked, and libutp's sender
+		// backs off hard enough that a larger transfer only costs wall clock.
+		transfer(t, dialed, accepted, 64<<10)
+	})
 }

@@ -7,9 +7,19 @@
   `net.Listener` and `net.PacketConn`, and its connections implement `net.Conn`. The state
   machine, LEDBAT congestion control, selective acknowledgements and fast resend, retransmission
   timers and MTU search follow libutp closely, including its constants
-- Add `interop`, which tests `pureutp` against libutp on the wire: both directions, both roles,
-  bidirectional transfers, ping-pong, and transfers over a link that drops, delays and duplicates
-  packets. `pureutp` also passes `nettest.TestConn`
+- Add `utp`, one interface over both implementations, selected at build time. `utp.Default` is
+  libutp; the `purego` build tag or `CGO_ENABLED=0` makes it `pureutp` and leaves the C++ sources
+  uncompiled. `utp.Socket` and `utp.Implementation` are both interfaces, so code can be handed
+  either implementation as a value: `utp.Pure` is always available, `utp.Libutp` wherever libutp
+  is compiled. The shared tunables are `WithLogger`, `WithBufferSizes`, `WithTargetDelay` and
+  `Socket.SetLogging`
+- Add `interop`, which tests the two implementations against each other on the wire: transfers in
+  both directions, bidirectional transfers, ping-pong, and transfers over a link that drops,
+  delays and duplicates packets. Every case runs over each ordered pair of implementations, so
+  each is also tested against itself, with libutp against libutp as the control. `pureutp` also
+  passes `nettest.TestConn`
+- CI: add a `purego` job covering the build tag and the cgo-off build, mirrored by
+  `just test-purego` and `just test-nocgo`
 
 ## v1.5.1 — 2026-08-17
 

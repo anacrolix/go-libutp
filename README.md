@@ -121,6 +121,42 @@ fed back in, and the don't-fragment bit isn't set on MTU probes, so path MTU is 
 timeouts and duplicate acks rather than reported outright. Neither affects correctness; the search
 just tends to settle high. The cgo package doesn't act on ICMP either.
 
+## Picking one at build time
+
+[`utp`](utp) is one interface over both, and selects one of them when you build. Depend on it
+rather than on either implementation and the choice stays yours:
+
+```go
+import "github.com/anacrolix/go-libutp/utp"
+
+s, err := utp.NewSocket("udp", ":4242")   // shorthand for utp.Default.NewSocket
+c, err := s.DialContext(ctx, "", "example.com:4242")
+```
+
+`utp.Default` is libutp. The `purego` build tag, or cgo being off, makes it `pureutp` instead, and
+the C++ sources are then not compiled at all:
+
+```sh
+go build -tags purego ./...
+CGO_ENABLED=0 go build ./...
+```
+
+`utp.Socket` is an interface, so code can be handed one without caring which is underneath, and so
+is `utp.Implementation` — `utp.Pure` and `utp.Libutp` are values of it, and `utp.Default` is
+whichever the build picked. `utp.Libutp` only exists where libutp is being compiled. That's how the
+interop tests run each implementation against the other, and each against itself.
+
+The tunables both implementations share are options: `utp.WithLogger`, `utp.WithBufferSizes` and
+`utp.WithTargetDelay`, plus `Socket.SetLogging` for the protocol's own log categories. Anything an
+implementation offers beyond that stays in its own package.
+
+Two differences to know about. `Implementation.NewSocket` listens with `net.ListenPacket`, so it
+takes UDP networks only — the cgo package's own `NewSocket` also understands the in-process test
+network, and through `utp` you'd reach that with `NewSocketFromPacketConn`. And deadlines on the
+`Socket` itself, which only affect `ReadFrom` and `WriteTo`, aren't supported by libutp: it returns
+an error wrapping `errors.ErrUnsupported`, where the pure implementation honours them. Deadlines on
+connections work in both.
+
 ## ucat
 
 `cmd/ucat` is a netcat-alike over µTP, handy for smoke-testing:
@@ -135,9 +171,11 @@ go run ./cmd/ucat localhost:4242   # dial, then pipe stdin/stdout
 The [justfile](justfile) mirrors the CI jobs, so what you run locally is what CI runs:
 
 ```sh
-just test    # go test -race -count 2 ./...
-just bench   # build/smoke the benchmarks
-just asan    # tests under LeakSanitizer
+just test          # go test -race -count 2 ./...
+just bench         # build/smoke the benchmarks
+just test-purego   # the pure Go implementation selected via the build tag
+just test-nocgo    # the pure Go packages with cgo off entirely
+just asan          # tests under LeakSanitizer
 ```
 
 `just asan` is clean on Linux and macOS; see [lsan_suppressions.txt](lsan_suppressions.txt) for the
