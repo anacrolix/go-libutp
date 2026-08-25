@@ -75,7 +75,7 @@ func lossySocket(t *testing.T, impl utp.Implementation, seed uint64) utp.Socket 
 	t.Helper()
 	pc, err := net.ListenPacket("udp", localhost)
 	qt.Assert(t, qt.IsNil(err))
-	s, err := impl.NewSocketFromPacketConn(&lossyPacketConn{
+	s, err := impl.NewSocket(&lossyPacketConn{
 		PacketConn: pc,
 		r:          rand.New(rand.NewPCG(seed, seed*2+1)),
 	})

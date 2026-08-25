@@ -3,6 +3,7 @@
 package utp
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func TestDefaultImplementationIsPure(t *testing.T) {
-	qt.Check(t, qt.Equals(Default.Name(), "pureutp"))
+	qt.Check(t, qt.Equals(fmt.Sprint(Default), "pureutp"))
 	qt.Check(t, qt.Equals(Default, Pure))
 }
 

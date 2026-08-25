@@ -11,8 +11,10 @@
   libutp; the `purego` build tag or `CGO_ENABLED=0` makes it `pureutp` and leaves the C++ sources
   uncompiled. `utp.Socket` and `utp.Implementation` are both interfaces, so code can be handed
   either implementation as a value: `utp.Pure` is always available, `utp.Libutp` wherever libutp
-  is compiled. The shared tunables are `WithLogger`, `WithBufferSizes`, `WithTargetDelay` and
-  `Socket.SetLogging`
+  is compiled. An `Implementation` makes a `Socket` over a `net.PacketConn`, and `utp.Listen`
+  opens a port for one. `utp.NewSocket` and `utp.NewSocketFromPacketConn` use `utp.Default` and
+  match the signatures of the constructors of those names in both underlying packages. The shared
+  tunables are `WithLogger`, `WithBufferSizes`, `WithTargetDelay` and `Socket.SetLogging`
 - Add `interop`, which tests the two implementations against each other on the wire: transfers in
   both directions, bidirectional transfers, ping-pong, and transfers over a link that drops,
   delays and duplicates packets. Every case runs over each ordered pair of implementations, so

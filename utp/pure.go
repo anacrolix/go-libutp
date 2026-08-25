@@ -8,7 +8,7 @@ import (
 
 // Pure is the pure Go implementation, [github.com/anacrolix/go-libutp/pureutp]. It is available
 // whatever the build selected as [Default].
-var Pure Implementation = &implementation{"pureutp", newPureSocketFromPacketConn}
+var Pure Implementation = &implementation{"pureutp", newPureSocket}
 
 // Adapts a pureutp Socket to the Socket interface. Everything but the firewall callback, whose
 // type differs, is already the right shape.
@@ -26,7 +26,7 @@ func (me pureSocket) SetFirewallCallback(f FirewallCallback) {
 	me.Socket.SetFirewallCallback(pureutp.FirewallCallback(f))
 }
 
-func newPureSocketFromPacketConn(pc net.PacketConn, opts ...Option) (Socket, error) {
+func newPureSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	o := newOptions(opts)
 	var popts []pureutp.NewSocketOpt
 	if o.hasLogger {

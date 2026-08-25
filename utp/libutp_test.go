@@ -4,6 +4,7 @@ package utp
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,13 +12,13 @@ import (
 )
 
 func TestDefaultImplementationIsLibutp(t *testing.T) {
-	qt.Check(t, qt.Equals(Default.Name(), "libutp"))
+	qt.Check(t, qt.Equals(fmt.Sprint(Default), "libutp"))
 	qt.Check(t, qt.Equals(Default, Libutp))
 }
 
 // libutp's Socket has no deadlines. Reporting that beats the panic the underlying package raises.
 func TestLibutpSocketDeadlinesUnsupported(t *testing.T) {
-	s, err := Libutp.NewSocket("udp", "localhost:0")
+	s, err := Listen(Libutp, "udp", "localhost:0")
 	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	qt.Check(t, qt.ErrorIs(s.SetDeadline(time.Now()), errors.ErrUnsupported))
@@ -29,7 +30,7 @@ func TestLibutpSocketDeadlinesUnsupported(t *testing.T) {
 // the interop tests run each against the other.
 func TestBothImplementationsAvailable(t *testing.T) {
 	for _, impl := range []Implementation{Libutp, Pure} {
-		s, err := impl.NewSocket("udp", "localhost:0")
+		s, err := Listen(impl, "udp", "localhost:0")
 		qt.Assert(t, qt.IsNil(err), qt.Commentf("%v", impl))
 		qt.Check(t, qt.IsNil(s.Close()))
 	}

@@ -14,7 +14,7 @@ import (
 // Libutp is the C++ reference implementation, [github.com/anacrolix/go-libutp], reached through
 // cgo. It only exists where libutp is being compiled: not under the purego tag, and not with cgo
 // disabled.
-var Libutp Implementation = &implementation{"libutp", newLibutpSocketFromPacketConn}
+var Libutp Implementation = &implementation{"libutp", newLibutpSocket}
 
 // Default is the implementation this binary was built with: libutp here, because the build
 // neither set the purego tag nor disabled cgo. A program that wants to override the build's
@@ -68,7 +68,7 @@ func boolOption(b bool) int {
 	return 0
 }
 
-func newLibutpSocketFromPacketConn(pc net.PacketConn, opts ...Option) (Socket, error) {
+func newLibutpSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	o := newOptions(opts)
 	var lopts []libutp.NewSocketOpt
 	if o.hasLogger {

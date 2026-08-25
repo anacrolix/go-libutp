@@ -8,13 +8,16 @@
 //	go build -tags purego ./...
 //	CGO_ENABLED=0 go build ./...
 //
-// [Default] is whichever one the build selected, and [NewSocket] is shorthand for
-// Default.NewSocket. Code that wants a particular implementation rather than the default can name
-// [Pure] or [Libutp] directly; Libutp only exists where libutp is being compiled, which is to say
-// not under the purego tag and not with cgo disabled.
+// [Default] is whichever one the build selected. [NewSocket] and [NewSocketFromPacketConn] use
+// it and have the same signatures as the constructors of those names in both underlying packages,
+// so switching a caller over to this package is an import change. Code that wants a particular
+// implementation rather than the default can name [Pure] or [Libutp] directly; Libutp only exists
+// where libutp is being compiled, which is to say not under the purego tag and not with cgo
+// disabled.
 //
 // Implementations are values, so code that has to work with either can take an [Implementation]
-// and be handed one, rather than choosing at its own build time.
+// and be handed one, rather than choosing at its own build time. An Implementation makes a Socket
+// over a PacketConn; [Listen] opens one for it.
 package utp
 
 import (
@@ -25,17 +28,15 @@ import (
 	"github.com/anacrolix/log"
 )
 
-// An Implementation makes Sockets. The two in this module are [Pure] and [Libutp], and [Default]
-// is whichever the build selected.
+// An Implementation makes Sockets over a PacketConn. The two in this module are [Pure] and
+// [Libutp], and [Default] is whichever the build selected.
+//
+// Owning a port is not part of it: use [Listen] to have one opened for an implementation. Both
+// values here also print as their name, so fmt.Sprint(utp.Default) is "libutp" or "pureutp".
 type Implementation interface {
-	// Name is "pureutp" or "libutp".
-	Name() string
-	// NewSocket listens on the given network and address. Only UDP networks are supported; for
-	// anything else, listen yourself and use NewSocketFromPacketConn.
-	NewSocket(network, addr string, opts ...Option) (Socket, error)
-	// NewSocketFromPacketConn runs µTP over a PacketConn you already have. The Socket takes
-	// ownership of it: closing the Socket closes the PacketConn.
-	NewSocketFromPacketConn(pc net.PacketConn, opts ...Option) (Socket, error)
+	// NewSocket runs µTP over a PacketConn. The Socket takes ownership of it: closing the Socket
+	// closes the PacketConn.
+	NewSocket(pc net.PacketConn, opts ...Option) (Socket, error)
 }
 
 // A FirewallCallback reports whether an incoming connection should be ignored. Rejecting one this
@@ -134,29 +135,31 @@ func newOptions(opts []Option) (o options) {
 	return
 }
 
-// Both implementations build their sockets on a PacketConn and listen the same way, so they only
-// have to provide the constructor that takes one.
+// The two implementations in this module, which differ only in the constructor they wrap.
 //
 // Used through a pointer so that Implementation values are comparable: Default == Libutp is a
 // reasonable thing to write, and a struct with a func field in it would panic.
 type implementation struct {
-	name              string
-	newFromPacketConn func(pc net.PacketConn, opts ...Option) (Socket, error)
+	name      string
+	newSocket func(pc net.PacketConn, opts ...Option) (Socket, error)
 }
 
-func (me *implementation) Name() string   { return me.name }
 func (me *implementation) String() string { return me.name }
 
-func (me *implementation) NewSocketFromPacketConn(pc net.PacketConn, opts ...Option) (Socket, error) {
-	return me.newFromPacketConn(pc, opts...)
+func (me *implementation) NewSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
+	return me.newSocket(pc, opts...)
 }
 
-func (me *implementation) NewSocket(network, addr string, opts ...Option) (Socket, error) {
+// Listen opens a port for impl and returns a Socket over it. Only UDP networks are supported; for
+// anything else, listen yourself and pass the PacketConn to [Implementation.NewSocket].
+//
+// The Socket owns the port: closing the Socket closes it.
+func Listen(impl Implementation, network, addr string, opts ...Option) (Socket, error) {
 	pc, err := net.ListenPacket(network, addr)
 	if err != nil {
 		return nil, err
 	}
-	s, err := me.newFromPacketConn(pc, opts...)
+	s, err := impl.NewSocket(pc, opts...)
 	if err != nil {
 		pc.Close()
 		return nil, err
@@ -164,14 +167,15 @@ func (me *implementation) NewSocket(network, addr string, opts ...Option) (Socke
 	return s, nil
 }
 
-// NewSocket listens on the given network and address using [Default]. Only UDP networks are
-// supported; for anything else, listen yourself and use [NewSocketFromPacketConn].
+// NewSocket listens on the given network and address using [Default]. It is [Listen] with the
+// implementation the build selected, and has the same signature as the constructor of the same
+// name in both underlying packages.
 func NewSocket(network, addr string, opts ...Option) (Socket, error) {
-	return Default.NewSocket(network, addr, opts...)
+	return Listen(Default, network, addr, opts...)
 }
 
 // NewSocketFromPacketConn runs µTP over a PacketConn you already have, using [Default]. The
 // Socket takes ownership of it: closing the Socket closes the PacketConn.
 func NewSocketFromPacketConn(pc net.PacketConn, opts ...Option) (Socket, error) {
-	return Default.NewSocketFromPacketConn(pc, opts...)
+	return Default.NewSocket(pc, opts...)
 }

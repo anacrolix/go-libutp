@@ -3,6 +3,7 @@ package utp
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -154,19 +155,32 @@ func TestFirewallCallback(t *testing.T) {
 // passed around and used without knowing which one it is.
 func TestPureAlwaysAvailable(t *testing.T) {
 	var impl Implementation = Pure
-	qt.Check(t, qt.Equals(impl.Name(), "pureutp"))
-	s, err := impl.NewSocket("udp", "localhost:0")
+	qt.Check(t, qt.Equals(fmt.Sprint(impl), "pureutp"))
+	s, err := Listen(impl, "udp", "localhost:0")
 	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	qt.Check(t, qt.IsNil(s.SetReadDeadline(time.Now().Add(time.Hour))))
+}
+
+// An Implementation only has to make a Socket over a PacketConn. Listen is what opens one for it,
+// and it doesn't leave the port open if the Socket can't be built.
+func TestListen(t *testing.T) {
+	s, err := Listen(Default, "udp", "localhost:0")
+	qt.Assert(t, qt.IsNil(err))
+	defer s.Close()
+	qt.Check(t, qt.Equals(s.Addr().Network(), "udp"))
+
+	_, err = Listen(Default, "tcp", "localhost:0")
+	qt.Check(t, qt.IsNotNil(err), qt.Commentf("listened on a network that isn't packet oriented"))
 }
 
 // NewSocket is Default.NewSocket, and NewSocketFromPacketConn takes a PacketConn the caller
 // already owns.
 func TestDefaultAndPackageFunctions(t *testing.T) {
 	qt.Assert(t, qt.IsNotNil(Default))
-	qt.Check(t, qt.IsTrue(Default.Name() == "libutp" || Default.Name() == "pureutp"),
-		qt.Commentf("unexpected implementation %q", Default.Name()))
+	name := fmt.Sprint(Default)
+	qt.Check(t, qt.IsTrue(name == "libutp" || name == "pureutp"),
+		qt.Commentf("unexpected implementation %q", name))
 
 	pc, err := net.ListenPacket("udp", "localhost:0")
 	qt.Assert(t, qt.IsNil(err))
@@ -175,13 +189,6 @@ func TestDefaultAndPackageFunctions(t *testing.T) {
 	// The Socket owns the PacketConn now, including its port.
 	qt.Check(t, qt.Equals(s.Addr().String(), pc.LocalAddr().String()))
 	qt.Assert(t, qt.IsNil(s.Close()))
-}
-
-// A network the implementations don't listen on has to fail rather than panic, and must not leak
-// the PacketConn when the Socket can't be built.
-func TestNewSocketBadNetwork(t *testing.T) {
-	_, err := NewSocket("tcp", "localhost:0")
-	qt.Check(t, qt.IsNotNil(err))
 }
 
 // Turning the protocol log categories on and off works on either implementation. There's nothing

@@ -13,6 +13,7 @@ package interop
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -34,7 +35,8 @@ func forEachPair(t *testing.T, f func(t *testing.T, dialer, acceptor utp.Impleme
 	t.Helper()
 	for _, dialer := range implementations {
 		for _, acceptor := range implementations {
-			t.Run(dialer.Name()+"_dials_"+acceptor.Name(), func(t *testing.T) {
+			// Implementations print as their name.
+			t.Run(fmt.Sprintf("%v_dials_%v", dialer, acceptor), func(t *testing.T) {
 				f(t, dialer, acceptor)
 			})
 		}
@@ -44,7 +46,7 @@ func forEachPair(t *testing.T, f func(t *testing.T, dialer, acceptor utp.Impleme
 // Listens on a fresh loopback port.
 func socket(t *testing.T, impl utp.Implementation) utp.Socket {
 	t.Helper()
-	s, err := impl.NewSocket("udp", localhost)
+	s, err := utp.Listen(impl, "udp", localhost)
 	qt.Assert(t, qt.IsNil(err), qt.Commentf("%v", impl))
 	t.Cleanup(func() { s.Close() })
 	return s

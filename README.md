@@ -129,7 +129,7 @@ rather than on either implementation and the choice stays yours:
 ```go
 import "github.com/anacrolix/go-libutp/utp"
 
-s, err := utp.NewSocket("udp", ":4242")   // shorthand for utp.Default.NewSocket
+s, err := utp.NewSocket("udp", ":4242")   // the implementation the build selected
 c, err := s.DialContext(ctx, "", "example.com:4242")
 ```
 
@@ -141,21 +141,33 @@ go build -tags purego ./...
 CGO_ENABLED=0 go build ./...
 ```
 
+`utp.NewSocket` and `utp.NewSocketFromPacketConn` have the same signatures as the constructors of
+those names in both underlying packages, so moving a caller onto this package is an import change.
+
 `utp.Socket` is an interface, so code can be handed one without caring which is underneath, and so
 is `utp.Implementation` — `utp.Pure` and `utp.Libutp` are values of it, and `utp.Default` is
 whichever the build picked. `utp.Libutp` only exists where libutp is being compiled. That's how the
 interop tests run each implementation against the other, and each against itself.
 
+An `Implementation` has one method: it makes a `Socket` over a `net.PacketConn`. Opening a port
+isn't its job, so `utp.Listen` does that for it, and code holding a PacketConn already can hand it
+straight over:
+
+```go
+s, err := utp.Listen(utp.Pure, "udp", ":4242")
+s, err := utp.Pure.NewSocket(pc)
+```
+
 The tunables both implementations share are options: `utp.WithLogger`, `utp.WithBufferSizes` and
 `utp.WithTargetDelay`, plus `Socket.SetLogging` for the protocol's own log categories. Anything an
 implementation offers beyond that stays in its own package.
 
-Two differences to know about. `Implementation.NewSocket` listens with `net.ListenPacket`, so it
-takes UDP networks only — the cgo package's own `NewSocket` also understands the in-process test
-network, and through `utp` you'd reach that with `NewSocketFromPacketConn`. And deadlines on the
-`Socket` itself, which only affect `ReadFrom` and `WriteTo`, aren't supported by libutp: it returns
-an error wrapping `errors.ErrUnsupported`, where the pure implementation honours them. Deadlines on
-connections work in both.
+Two differences to know about. `utp.Listen` listens with `net.ListenPacket`, so it takes UDP
+networks only — the cgo package's own `NewSocket` also understands the in-process test network, and
+through `utp` you'd reach that by opening it yourself and calling `Implementation.NewSocket`. And
+deadlines on the `Socket` itself, which only affect `ReadFrom` and `WriteTo`, aren't supported by
+libutp: it returns an error wrapping `errors.ErrUnsupported`, where the pure implementation honours
+them. Deadlines on connections work in both.
 
 ## ucat
 
