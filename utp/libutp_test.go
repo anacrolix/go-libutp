@@ -29,10 +29,10 @@ func TestLibutpSocketDeadlinesUnsupported(t *testing.T) {
 // Both implementations are reachable by name when libutp is being compiled, which is what lets
 // the interop tests run each against the other.
 func TestBothImplementationsAvailable(t *testing.T) {
-	for _, impl := range []Implementation{Libutp, Pure} {
+	for _, impl := range []Implementation{Libutp, Purego} {
 		s, err := Listen(impl, "udp", "localhost:0")
 		qt.Assert(t, qt.IsNil(err), qt.Commentf("%v", impl))
 		qt.Check(t, qt.IsNil(s.Close()))
 	}
-	qt.Check(t, qt.Not(qt.Equals(Libutp, Pure)))
+	qt.Check(t, qt.Not(qt.Equals(Libutp, Purego)))
 }

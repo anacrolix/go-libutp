@@ -1,4 +1,4 @@
-// Package pureutp implements the Micro Transport Protocol (µTP, BEP 29) in pure Go.
+// Package purego implements the Micro Transport Protocol (µTP, BEP 29) in pure Go.
 //
 // µTP is a reliable, ordered, stream oriented transport that runs over UDP. What distinguishes it
 // from TCP is its congestion control: LEDBAT measures the one way queuing delay towards the peer
@@ -18,7 +18,7 @@
 // A [Socket] owns a UDP port and multiplexes connections over it. It implements both
 // [net.Listener] and [net.PacketConn], and the connections it hands out implement [net.Conn]:
 //
-//	s, err := pureutp.NewSocket("udp", ":4242")
+//	s, err := purego.NewSocket("udp", ":4242")
 //	if err != nil {
 //		return err
 //	}
@@ -59,4 +59,4 @@
 //     libutp overwrites the state before testing it, so it always reports a reset one.
 //   - A selective acknowledgement is read one bit short of where libutp reads it, which is one
 //     byte past the end of the header.
-package pureutp
+package purego

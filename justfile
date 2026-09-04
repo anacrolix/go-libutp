@@ -21,7 +21,7 @@ test-purego:
 # The pure Go packages have to build and pass with cgo off entirely, as in the CI `purego` job.
 # -race needs cgo, so it can't be used here, and the libutp wrapper can't build at all.
 test-nocgo:
-    CGO_ENABLED=0 go test -count 2 ./utp/... ./pureutp/...
+    CGO_ENABLED=0 go test -count 2 ./utp/... ./purego/...
 
 # netgo and the suppressions file only matter on macOS; both are inert on Linux.
 # See lsan_suppressions.txt.

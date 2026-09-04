@@ -2,11 +2,11 @@
 
 // Package interop checks that this module's two µTP implementations agree on the wire.
 //
-// Every test runs over each ordered pair of implementations, so as well as pureutp against
+// Every test runs over each ordered pair of implementations, so as well as purego against
 // libutp in both roles, each is also tested against itself. libutp against libutp is the control:
 // a failure there is the test's fault or the network's, not the port's.
 //
-// It's a separate package so that pureutp doesn't grow a dependency on cgo, and it needs libutp
+// It's a separate package so that purego doesn't grow a dependency on cgo, and it needs libutp
 // itself, so it's skipped when libutp isn't being compiled.
 package interop
 
@@ -25,8 +25,8 @@ import (
 )
 
 // The implementations under test. Every test runs over each ordered pair of these, so as well as
-// pureutp against libutp in both roles, each is run against itself.
-var implementations = []utp.Implementation{utp.Libutp, utp.Pure}
+// purego against libutp in both roles, each is run against itself.
+var implementations = []utp.Implementation{utp.Libutp, utp.Purego}
 
 const localhost = "localhost:0"
 

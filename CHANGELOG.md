@@ -10,16 +10,16 @@
   errors at warn, giving up on a socket at error, and everything else at debug. The categories
   `Socket.SetLogging` turns on are logged at debug, with a `category` attribute, and keep their
   libutp-shaped message text so the two implementations' logs can still be read side by side.
-  `pureutp` now imports nothing outside the standard library
-- Add `pureutp`, a pure Go implementation of µTP ported from the vendored libutp sources. It needs
+  `purego` now imports nothing outside the standard library
+- Add `purego`, a pure Go implementation of µTP ported from the vendored libutp sources. It needs
   no cgo and no C++ compiler, and offers the same API shape as the wrapper: `Socket` implements
   `net.Listener` and `net.PacketConn`, and its connections implement `net.Conn`. The state
   machine, LEDBAT congestion control, selective acknowledgements and fast resend, retransmission
   timers and MTU search follow libutp closely, including its constants
 - Add `utp`, one interface over both implementations, selected at build time. `utp.Default` is
-  libutp; the `purego` build tag or `CGO_ENABLED=0` makes it `pureutp` and leaves the C++ sources
-  uncompiled. `utp.Socket` and `utp.Implementation` are both interfaces, so code can be handed
-  either implementation as a value: `utp.Pure` is always available, `utp.Libutp` wherever libutp
+  libutp; the `purego` build tag or `CGO_ENABLED=0` makes it `utp.Purego` and leaves the C++
+  sources uncompiled. `utp.Socket` and `utp.Implementation` are both interfaces, so code can be handed
+  either implementation as a value: `utp.Purego` is always available, `utp.Libutp` wherever libutp
   is compiled. An `Implementation` makes a `Socket` over a `net.PacketConn`, and `utp.Listen`
   opens a port for one. `utp.NewSocket` and `utp.NewSocketFromPacketConn` use `utp.Default` and
   match the signatures of the constructors of those names in both underlying packages. The shared
@@ -27,7 +27,7 @@
 - Add `interop`, which tests the two implementations against each other on the wire: transfers in
   both directions, bidirectional transfers, ping-pong, and transfers over a link that drops,
   delays and duplicates packets. Every case runs over each ordered pair of implementations, so
-  each is also tested against itself, with libutp against libutp as the control. `pureutp` also
+  each is also tested against itself, with libutp against libutp as the control. `purego` also
   passes `nettest.TestConn`
 - CI: add a `purego` job covering the build tag and the cgo-off build, mirrored by
   `just test-purego` and `just test-nocgo`

@@ -99,15 +99,15 @@ an accepted or dialled `Conn` work normally.
 
 ## Pure Go implementation
 
-[`pureutp`](pureutp) is µTP implemented in Go, with no cgo and no C++ compiler. It's a port of the
+[`purego`](purego) is µTP implemented in Go, with no cgo and no C++ compiler. It's a port of the
 same libutp sources vendored here: the state machine, the LEDBAT congestion controller, selective
 acknowledgements and fast resend, the retransmission timers and the MTU search all follow the
 reference implementation, down to the constants they're tuned with.
 
 ```go
-import "github.com/anacrolix/go-libutp/pureutp"
+import "github.com/anacrolix/go-libutp/purego"
 
-s, err := pureutp.NewSocket("udp", ":4242")
+s, err := purego.NewSocket("udp", ":4242")
 ```
 
 It imports nothing outside the standard library, logging included, and it builds for every
@@ -134,8 +134,8 @@ s, err := utp.NewSocket("udp", ":4242")   // the implementation the build select
 c, err := s.DialContext(ctx, "", "example.com:4242")
 ```
 
-`utp.Default` is libutp. The `purego` build tag, or cgo being off, makes it `pureutp` instead, and
-the C++ sources are then not compiled at all:
+`utp.Default` is libutp. The `purego` build tag, or cgo being off, makes it `utp.Purego` instead,
+and the C++ sources are then not compiled at all — the tag and the package it selects share a name:
 
 ```sh
 go build -tags purego ./...
@@ -146,7 +146,7 @@ CGO_ENABLED=0 go build ./...
 those names in both underlying packages, so moving a caller onto this package is an import change.
 
 `utp.Socket` is an interface, so code can be handed one without caring which is underneath, and so
-is `utp.Implementation` — `utp.Pure` and `utp.Libutp` are values of it, and `utp.Default` is
+is `utp.Implementation` — `utp.Purego` and `utp.Libutp` are values of it, and `utp.Default` is
 whichever the build picked. `utp.Libutp` only exists where libutp is being compiled. That's how the
 interop tests run each implementation against the other, and each against itself.
 
@@ -155,8 +155,8 @@ isn't its job, so `utp.Listen` does that for it, and code holding a PacketConn a
 straight over:
 
 ```go
-s, err := utp.Listen(utp.Pure, "udp", ":4242")
-s, err := utp.Pure.NewSocket(pc)
+s, err := utp.Listen(utp.Purego, "udp", ":4242")
+s, err := utp.Purego.NewSocket(pc)
 ```
 
 The tunables both implementations share are options: `utp.WithLogger`, `utp.WithBufferSizes` and

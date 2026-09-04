@@ -1,4 +1,4 @@
-package pureutp
+package purego
 
 import (
 	"net"

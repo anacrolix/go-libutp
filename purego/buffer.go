@@ -1,4 +1,4 @@
-package pureutp
+package purego
 
 // A circular buffer indexed directly by (wrapping) sequence number. Slots are pointers so that an
 // absent element is distinguishable from a zero one, and the buffer grows by powers of two as the

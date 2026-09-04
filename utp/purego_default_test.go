@@ -10,13 +10,13 @@ import (
 	"github.com/go-quicktest/qt"
 )
 
-func TestDefaultImplementationIsPure(t *testing.T) {
-	qt.Check(t, qt.Equals(fmt.Sprint(Default), "pureutp"))
-	qt.Check(t, qt.Equals(Default, Pure))
+func TestDefaultImplementationIsPurego(t *testing.T) {
+	qt.Check(t, qt.Equals(fmt.Sprint(Default), "purego"))
+	qt.Check(t, qt.Equals(Default, Purego))
 }
 
 // The pure implementation does support Socket deadlines, so the default Socket does here.
-func TestPureSocketDeadlinesWork(t *testing.T) {
+func TestPuregoSocketDeadlinesWork(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
 	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()

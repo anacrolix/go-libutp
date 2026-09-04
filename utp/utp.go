@@ -3,7 +3,8 @@
 //
 // By default it uses libutp, the C++ reference implementation, through cgo. Building with the
 // purego tag, or with cgo disabled, uses the pure Go implementation in
-// [github.com/anacrolix/go-libutp/pureutp] instead:
+// [github.com/anacrolix/go-libutp/purego] instead — the tag and the package it selects share a
+// name:
 //
 //	go build -tags purego ./...
 //	CGO_ENABLED=0 go build ./...
@@ -11,7 +12,7 @@
 // [Default] is whichever one the build selected. [NewSocket] and [NewSocketFromPacketConn] use
 // it and have the same signatures as the constructors of those names in both underlying packages,
 // so switching a caller over to this package is an import change. Code that wants a particular
-// implementation rather than the default can name [Pure] or [Libutp] directly; Libutp only exists
+// implementation rather than the default can name [Purego] or [Libutp] directly; Libutp only exists
 // where libutp is being compiled, which is to say not under the purego tag and not with cgo
 // disabled.
 //
@@ -27,11 +28,11 @@ import (
 	"time"
 )
 
-// An Implementation makes Sockets over a PacketConn. The two in this module are [Pure] and
+// An Implementation makes Sockets over a PacketConn. The two in this module are [Purego] and
 // [Libutp], and [Default] is whichever the build selected.
 //
 // Owning a port is not part of it: use [Listen] to have one opened for an implementation. Both
-// values here also print as their name, so fmt.Sprint(utp.Default) is "libutp" or "pureutp".
+// values here also print as their name, so fmt.Sprint(utp.Default) is "libutp" or "purego".
 type Implementation interface {
 	// NewSocket runs µTP over a PacketConn. The Socket takes ownership of it: closing the Socket
 	// closes the PacketConn.
@@ -101,7 +102,7 @@ type options struct {
 type Option func(*options)
 
 // WithLogger gives a Socket its own logger, instead of the implementation's package level one:
-// [github.com/anacrolix/go-libutp.Logger] or [github.com/anacrolix/go-libutp/pureutp.Logger],
+// [github.com/anacrolix/go-libutp.Logger] or [github.com/anacrolix/go-libutp/purego.Logger],
 // either of which is slog's default until it's set. This is the logger the categories in
 // [Socket.SetLogging] write to, along with anything either implementation has to report about the
 // socket itself.

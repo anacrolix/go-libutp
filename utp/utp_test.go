@@ -154,11 +154,11 @@ func TestFirewallCallback(t *testing.T) {
 	qt.Check(t, qt.IsTrue(asked > 0), qt.Commentf("firewall callback was never consulted"))
 }
 
-// Pure is available whatever the build selected, and an Implementation is a value that can be
+// Purego is available whatever the build selected, and an Implementation is a value that can be
 // passed around and used without knowing which one it is.
-func TestPureAlwaysAvailable(t *testing.T) {
-	var impl Implementation = Pure
-	qt.Check(t, qt.Equals(fmt.Sprint(impl), "pureutp"))
+func TestPuregoAlwaysAvailable(t *testing.T) {
+	var impl Implementation = Purego
+	qt.Check(t, qt.Equals(fmt.Sprint(impl), "purego"))
 	s, err := Listen(impl, "udp", "localhost:0")
 	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
@@ -182,7 +182,7 @@ func TestListen(t *testing.T) {
 func TestDefaultAndPackageFunctions(t *testing.T) {
 	qt.Assert(t, qt.IsNotNil(Default))
 	name := fmt.Sprint(Default)
-	qt.Check(t, qt.IsTrue(name == "libutp" || name == "pureutp"),
+	qt.Check(t, qt.IsTrue(name == "libutp" || name == "purego"),
 		qt.Commentf("unexpected implementation %q", name))
 
 	pc, err := net.ListenPacket("udp", "localhost:0")
@@ -246,7 +246,7 @@ func TestWithLogger(t *testing.T) {
 	s, err := NewSocketFromPacketConn(unsendablePacketConn{pc}, WithLogger(slog.New(h)))
 	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
-	// pureutp reports a failed send under its normal category; libutp reports it regardless.
+	// purego reports a failed send under its normal category; libutp reports it regardless.
 	s.SetLogging(true, true, true)
 	// The dial's syn is a send, and every send on this Socket fails, so the dial can only time
 	// out. It's what it logs on the way there that this is about.
