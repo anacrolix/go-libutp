@@ -166,8 +166,16 @@ func (s *Socket) newConn(us *C.utp_socket) *Conn {
 	}
 	c.cond.L = &mu
 	s.conns[us] = c
-	c.writeDeadlineTimer = time.AfterFunc(-1, c.cond.Broadcast)
-	c.readDeadlineTimer = time.AfterFunc(-1, c.cond.Broadcast)
+	// Broadcast must happen while holding mu, otherwise it can race with a
+	// goroutine that has just decided (while holding mu) to call cond.Wait,
+	// but has not yet done so: if the timer's Broadcast happens in that
+	// window, it is missed entirely (cond.Wait wasn't registered as a waiter
+	// yet), and the waiter can then block forever even though its deadline
+	// has already expired. Locking mu here forces the broadcast to happen
+	// either strictly before the deadline check (so it's observed) or after
+	// cond.Wait has actually parked (so it's woken up).
+	c.writeDeadlineTimer = time.AfterFunc(-1, c.broadcastCond)
+	c.readDeadlineTimer = time.AfterFunc(-1, c.broadcastCond)
 	return c
 }
 
