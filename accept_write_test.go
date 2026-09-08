@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 // gatedPacketConn only lets packets be received when a token is available. It
@@ -28,18 +28,18 @@ func (me gatedPacketConn) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
 // connection has to wake them up.
 func TestWriteOnAcceptedConnBeforeEstablished(t *testing.T) {
 	dialerPc, err := listenPacket("inproc", "")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	acceptorPc, err := listenPacket("inproc", "")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	// Only the initiating SYN gets through until we release the gate.
 	tokens := make(chan struct{}, 1)
 	tokens <- struct{}{}
 
 	dialer, err := NewSocketFromPacketConn(dialerPc)
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer dialer.Close()
 	acceptor, err := NewSocketFromPacketConn(gatedPacketConn{acceptorPc, tokens})
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer acceptor.Close()
 
 	dialed := make(chan net.Conn, 1)
@@ -54,7 +54,7 @@ func TestWriteOnAcceptedConnBeforeEstablished(t *testing.T) {
 	}()
 
 	accepted, err := acceptor.Accept()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer accepted.Close()
 
 	// The acceptor hasn't processed the dialer's data packet yet, so libutp
@@ -75,7 +75,7 @@ func TestWriteOnAcceptedConnBeforeEstablished(t *testing.T) {
 	close(tokens)
 	select {
 	case err := <-written:
-		require.NoError(t, err)
+		qt.Assert(t, qt.IsNil(err))
 	case <-time.After(10 * time.Second):
 		t.Fatal("write didn't complete after the connection was established")
 	}

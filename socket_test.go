@@ -3,23 +3,22 @@ package utp
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 func TestUseClosedSocket(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
-	assert.NoError(t, s.Close())
-	assert.NotPanics(t, func() { s.Close() })
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsNil(s.Close()))
+	qt.Check(t, qt.Not(qt.PanicMatches(func() { s.Close() }, ".*")))
 	c, err := s.Dial(neverResponds)
-	assert.Error(t, err)
-	assert.Nil(t, c)
+	qt.Check(t, qt.IsNotNil(err))
+	qt.Check(t, qt.IsNil(c))
 }
 
 func TestSocketNetwork(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
-	assert.Equal(t, "udp", s.Addr().Network())
+	qt.Check(t, qt.Equals(s.Addr().Network(), "udp"))
 }
