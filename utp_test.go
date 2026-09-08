@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/anacrolix/envpprof"
+	qt "github.com/frankban/quicktest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/nettest"
@@ -183,10 +184,13 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 }
 
 // Ensure that adding math.MaxInt64 to any current timestamp will result in the maximum "when" field
-// for a Timer.
+// for a Timer. time.AfterFunc clamps to math.MaxInt64 when the sum overflows, so either outcome is
+// the maximum. Timestamps come from the runtime's monotonic clock and are never negative, which is
+// what clearing the sign bit of the generated value stands for.
 func TestMaxExpiryTimerMath(t *testing.T) {
-	quick.Check(func(i int64) bool {
-		i += math.MaxInt64
-		return i == math.MaxInt64 || i < 0
-	}, nil)
+	qt.Check(t, quick.Check(func(u uint64) bool {
+		now := int64(u &^ (1 << 63))
+		when := now + math.MaxInt64
+		return when == math.MaxInt64 || when < 0
+	}, nil), qt.IsNil)
 }
