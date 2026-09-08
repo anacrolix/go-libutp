@@ -45,7 +45,10 @@ type Implementation interface {
 //
 // It is called while the Socket holds its own lock, so it must not block or call back into the
 // Socket.
-type FirewallCallback func(net.Addr) bool
+//
+// It's an alias rather than a defined type, so that an implementation's own callback type is the
+// same type and no conversion is needed either way.
+type FirewallCallback = func(net.Addr) bool
 
 // Socket is a µTP endpoint: it owns a packet conn and multiplexes connections over it.
 //

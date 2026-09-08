@@ -10,21 +10,9 @@ import (
 // whatever the build selected as [Default].
 var Purego Implementation = &implementation{"purego", newPuregoSocket}
 
-// Adapts a purego Socket to the Socket interface. Everything but the firewall callback, whose
-// type differs, is already the right shape.
-type puregoSocket struct {
-	*purego.Socket
-}
-
-var _ Socket = puregoSocket{}
-
-func (me puregoSocket) SetFirewallCallback(f FirewallCallback) {
-	if f == nil {
-		me.Socket.SetFirewallCallback(nil)
-		return
-	}
-	me.Socket.SetFirewallCallback(purego.FirewallCallback(f))
-}
+// A purego Socket is already the right shape in full, so it needs no adapter: it's returned as
+// itself, and a caller that wants the implementation's own API can assert for it.
+var _ Socket = (*purego.Socket)(nil)
 
 func newPuregoSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	o := newOptions(opts)
@@ -45,5 +33,5 @@ func newPuregoSocket(pc net.PacketConn, opts ...Option) (Socket, error) {
 	if o.receiveBuffer != 0 {
 		s.SetReadBufferLen(o.receiveBuffer)
 	}
-	return puregoSocket{s}, nil
+	return s, nil
 }

@@ -50,7 +50,11 @@ type rstInfo struct {
 // A firewall callback returns true if an incoming connection should be ignored. This is better
 // than accepting and immediately closing, because the peer sees no response at all rather than an
 // acknowledgement followed by a reset.
-type FirewallCallback func(net.Addr) bool
+//
+// It's an alias rather than a defined type so that this Socket satisfies interfaces declaring the
+// callback in their own terms, such as [github.com/anacrolix/go-libutp/utp.Socket], without a
+// wrapper to convert between two identical function types.
+type FirewallCallback = func(net.Addr) bool
 
 // Socket multiplexes uTP connections over a net.PacketConn. It implements net.Listener and
 // net.PacketConn: uTP traffic is dispatched to connections, and everything else is handed to

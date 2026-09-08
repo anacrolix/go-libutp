@@ -38,14 +38,11 @@ func (libutpSocket) SetDeadline(time.Time) error      { return errDeadlinesUnsup
 func (libutpSocket) SetReadDeadline(time.Time) error  { return errDeadlinesUnsupported }
 func (libutpSocket) SetWriteDeadline(time.Time) error { return errDeadlinesUnsupported }
 
+// The synchronous variant is the one libutp consults for every incoming connection, which is what
+// the interface documents. The asynchronous one is only reached when no synchronous callback is
+// set, so this can't just forward to SetFirewallCallback.
 func (me libutpSocket) SetFirewallCallback(f FirewallCallback) {
-	if f == nil {
-		me.Socket.SetSyncFirewallCallback(nil)
-		return
-	}
-	// The synchronous variant is the one libutp consults for every incoming connection, which is
-	// what the interface documents.
-	me.Socket.SetSyncFirewallCallback(libutp.FirewallCallback(f))
+	me.Socket.SetSyncFirewallCallback(f)
 }
 
 // libutp keeps the buffer sizes as context options, which new connections are created from.
