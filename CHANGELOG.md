@@ -2,35 +2,20 @@
 
 ## Unreleased
 
-- **Breaking**: log through `log/slog`. `Logger`, `WithLogger` and the `utp` package's
-  `WithLogger` option now take a `*slog.Logger` instead of an `anacrolix/log.Logger`. The
-  package-level `Logger` in both implementations starts out nil, which means a Socket created
-  without `WithLogger` logs to `slog.Default()` as it stands when the Socket is created. Records
-  carry attributes rather than formatted values, and go out at a level that suits them: read
-  errors at warn, giving up on a socket at error, and everything else at debug. The categories
-  `Socket.SetLogging` turns on are logged at debug, with a `category` attribute, and keep their
-  libutp-shaped message text so the two implementations' logs can still be read side by side.
-  `purego` now imports nothing outside the standard library
-- Add `purego`, a pure Go implementation of µTP ported from the vendored libutp sources. It needs
-  no cgo and no C++ compiler, and offers the same API shape as the wrapper: `Socket` implements
-  `net.Listener` and `net.PacketConn`, and its connections implement `net.Conn`. The state
-  machine, LEDBAT congestion control, selective acknowledgements and fast resend, retransmission
-  timers and MTU search follow libutp closely, including its constants
-- Add `utp`, one interface over both implementations, selected at build time. `utp.Default` is
-  libutp; the `purego` build tag or `CGO_ENABLED=0` makes it `utp.Purego` and leaves the C++
-  sources uncompiled. `utp.Socket` and `utp.Implementation` are both interfaces, so code can be handed
-  either implementation as a value: `utp.Purego` is always available, `utp.Libutp` wherever libutp
-  is compiled. An `Implementation` makes a `Socket` over a `net.PacketConn`, and `utp.Listen`
-  opens a port for one. `utp.NewSocket` and `utp.NewSocketFromPacketConn` use `utp.Default` and
-  match the signatures of the constructors of those names in both underlying packages. The shared
-  tunables are `WithLogger`, `WithBufferSizes`, `WithTargetDelay` and `Socket.SetLogging`
-- Add `interop`, which tests the two implementations against each other on the wire: transfers in
-  both directions, bidirectional transfers, ping-pong, and transfers over a link that drops,
-  delays and duplicates packets. Every case runs over each ordered pair of implementations, so
-  each is also tested against itself, with libutp against libutp as the control. `purego` also
-  passes `nettest.TestConn`
-- CI: add a `purego` job covering the build tag and the cgo-off build, mirrored by
-  `just test-purego` and `just test-nocgo`
+- **Breaking**: log through `log/slog`. `Logger` and the `WithLogger` option now take a
+  `*slog.Logger` instead of an `anacrolix/log.Logger`. The package-level `Logger` starts out nil,
+  which means a Socket created without `WithLogger` logs to `slog.Default()` as it stands when the
+  Socket is created. Records carry attributes rather than formatted values, and go out at a level
+  that suits them: read errors at warn, giving up on a socket at error, and everything else at
+  debug. The categories `Socket.SetLogging` turns on are logged at debug, with a `category`
+  attribute, and keep their libutp-shaped message text
+- The pure Go implementation and the package that chooses between the two at build time now live
+  in [go-utp](https://github.com/anacrolix/go-utp), which depends on this module for the cgo
+  wrapper. They were added here after v1.5.1 and never released, so there is nothing to migrate
+  unless you were tracking master: `github.com/anacrolix/go-libutp/utp` is now
+  `github.com/anacrolix/go-utp`, and `github.com/anacrolix/go-libutp/purego` is now
+  `github.com/anacrolix/go-utp/purego`. This module is unchanged as a libutp wrapper
+- CI: the `purego` job moved with them, along with `just test-purego` and `just test-nocgo`
 
 ## v1.5.1 — 2026-08-17
 

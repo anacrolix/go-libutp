@@ -12,7 +12,6 @@ require (
 	github.com/anacrolix/tagflag v1.1.0
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8
 	github.com/frankban/quicktest v1.14.6
-	github.com/go-quicktest/qt v1.102.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.47.0
 )
