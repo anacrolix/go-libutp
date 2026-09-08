@@ -6,16 +6,15 @@ import (
 	"testing"
 
 	"github.com/bradfitz/iter"
-	qt "github.com/frankban/quicktest"
+	"github.com/go-quicktest/qt"
 )
 
 // Test for a race that occurs if the error returned from PacketConn.WriteTo in sendtoCallback holds
 // a reference to the addr passed to the call, and the addr storage is reused between calls to
 // sendtoCallback in this instance.
 func TestSendToRaceErrorAddr(t *testing.T) {
-	c := qt.New(t)
 	s, err := NewSocket("udp", "localhost:0")
-	c.Assert(err, qt.IsNil)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -25,8 +24,8 @@ func TestSendToRaceErrorAddr(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, err := s.DialContext(ctx, "udp", "1.1.1.1:1")
-			c.Log(err.Error())
-			c.Assert(err, qt.Not(qt.IsNil))
+			t.Log(err.Error())
+			qt.Assert(t, qt.Not(qt.IsNil(err)))
 		}()
 	}
 	wg.Wait()

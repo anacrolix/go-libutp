@@ -10,9 +10,7 @@ import (
 	"time"
 
 	_ "github.com/anacrolix/envpprof"
-	qt "github.com/frankban/quicktest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 	"golang.org/x/net/nettest"
 )
 
@@ -81,33 +79,33 @@ func TestLibutpDialTimesOut(t *testing.T) {
 		t.SkipNow()
 	}
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	_, err = s.Dial(neverResponds)
-	require.Error(t, err)
+	qt.Assert(t, qt.IsNotNil(err))
 }
 
 // Ensure that our timeout is honored during dialing.
 func TestDialTimeout(t *testing.T) {
 	t.Parallel()
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	const timeout = time.Second
 	started := time.Now()
 	_, err = s.DialTimeout(neverResponds, timeout)
 	timeTaken := time.Since(started)
 	t.Logf("dial returned after %s", timeTaken)
-	assert.Equal(t, context.DeadlineExceeded, err)
-	assert.True(t, timeTaken >= timeout)
+	qt.Check(t, qt.Equals(err, context.DeadlineExceeded))
+	qt.Check(t, qt.IsTrue(timeTaken >= timeout))
 }
 
 func TestConnSendBuffer(t *testing.T) {
 	s0, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s0.Close()
 	s1, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s1.Close()
 	var (
 		c1        net.Conn
@@ -119,15 +117,15 @@ func TestConnSendBuffer(t *testing.T) {
 		c1, acceptErr = s1.Accept()
 	}()
 	c0, err := s0.Dial(s1.Addr().String())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	<-accepted
-	require.NoError(t, acceptErr)
+	qt.Assert(t, qt.IsNil(acceptErr))
 	defer c0.Close()
 	defer c1.Close()
 	buf := make([]byte, 1024)
 	written := 0
 	for {
-		require.NoError(t, c0.SetWriteDeadline(time.Now().Add(time.Second)))
+		qt.Assert(t, qt.IsNil(c0.SetWriteDeadline(time.Now().Add(time.Second))))
 		n, err := c0.Write(buf)
 		written += n
 		if err != nil {
@@ -141,18 +139,18 @@ func TestConnSendBuffer(t *testing.T) {
 func TestCanHandleConnectWriteErrors(t *testing.T) {
 	t.Parallel()
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	_, err = s.DialContext(context.Background(), "", "localhost:0")
-	require.Error(t, err)
+	qt.Assert(t, qt.IsNotNil(err))
 }
 
 func TestConnectConnAfterSocketClose(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	s.Close()
 	_, err = s.DialContext(context.Background(), "", "")
-	require.Equal(t, errSocketClosed, err)
+	qt.Assert(t, qt.Equals(err, errSocketClosed))
 }
 
 func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
@@ -168,7 +166,7 @@ func assertSocketConnsLen(t *testing.T, s *Socket, l int) {
 
 func TestSocketConnsAfterConnClosed(t *testing.T) {
 	s, err := NewSocket("udp", "localhost:0")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer s.Close()
 	c, err := s.DialContext(context.Background(), "", s.LocalAddr().String())
 	t.Logf("connecting to own socket: %v", err)
@@ -188,9 +186,9 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 // the maximum. Timestamps come from the runtime's monotonic clock and are never negative, which is
 // what clearing the sign bit of the generated value stands for.
 func TestMaxExpiryTimerMath(t *testing.T) {
-	qt.Check(t, quick.Check(func(u uint64) bool {
+	qt.Check(t, qt.IsNil(quick.Check(func(u uint64) bool {
 		now := int64(u &^ (1 << 63))
 		when := now + math.MaxInt64
 		return when == math.MaxInt64 || when < 0
-	}, nil), qt.IsNil)
+	}, nil)))
 }
