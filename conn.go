@@ -155,6 +155,16 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 }
 
+// broadcastCond acquires mu before broadcasting c.cond. It's used as the
+// callback for c.writeDeadlineTimer/c.readDeadlineTimer so that a deadline
+// firing can never race with, and be missed by, a goroutine that is about to
+// call c.cond.Wait while holding mu.
+func (c *Conn) broadcastCond() {
+	mu.Lock()
+	defer mu.Unlock()
+	c.cond.Broadcast()
+}
+
 func (c *Conn) writeNoWait(b []byte) (n int, err error) {
 	err = func() error {
 		switch {

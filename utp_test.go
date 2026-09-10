@@ -181,6 +181,46 @@ func TestSocketConnsAfterConnClosed(t *testing.T) {
 	assertSocketConnsLen(t, s, 0)
 }
 
+// Regression test for a lost-wakeup race between a read/write deadline
+// timer firing and a goroutine that is about to call cond.Wait while
+// holding mu. The deadline timer's callback must acquire mu before
+// broadcasting: otherwise, if the timer fires exactly while another
+// goroutine holds mu and is about to call cond.Wait (but hasn't yet), the
+// broadcast happens before there's any registered waiter and is lost
+// forever, leaving the waiter blocked even though its deadline has already
+// expired.
+func TestConnDeadlineTimerDoesNotLoseWakeup(t *testing.T) {
+	c := &Conn{}
+	c.cond.L = &mu
+	c.writeDeadlineTimer = time.AfterFunc(time.Hour, c.broadcastCond)
+	defer c.writeDeadlineTimer.Stop()
+
+	// Mirrors how Conn.Write/Read hold mu continuously from before checking
+	// the deadline until calling cond.Wait: lock mu here and don't release
+	// it until Wait is called below, so the timer firing in between
+	// exercises the exact race the fix guards against.
+	mu.Lock()
+	c.writeDeadlineTimer.Reset(time.Millisecond)
+	// Give the timer's callback a chance to run and, without the fix, race
+	// ahead of cond.Wait below by broadcasting before there's any waiter.
+	time.Sleep(50 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		// mu is already locked by this point (by the Lock call above); Wait
+		// registers as a waiter and releases mu internally.
+		c.cond.Wait()
+		mu.Unlock()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("deadline timer's broadcast was lost; waiter never woke up")
+	}
+}
+
 // Ensure that adding math.MaxInt64 to any current timestamp will result in the maximum "when" field
 // for a Timer. time.AfterFunc clamps to math.MaxInt64 when the sum overflows, so either outcome is
 // the maximum. Timestamps come from the runtime's monotonic clock and are never negative, which is
