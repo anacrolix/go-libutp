@@ -248,14 +248,14 @@ func (s *Socket) processReceivedMessages(ms []mmsg.Message) {
 			a.buf = (*C.byte)(&m.Buffers[0][0])
 			a.len = C.size_t(m.N)
 			var rsa syscall.RawSockaddrAny
-			rsa, a.sal = netAddrToLibSockaddr(m.Addr)
+			rsa, a.sal = netAddrToLibSockaddr(m.Addr())
 			a.sa = (*C.struct_sockaddr)(unsafe.Pointer(&rsa))
 		}
 		C.process_received_messages(s.ctx.asCPtr(), &args[0], C.size_t(len(ms)))
 	} else {
 		gotUtp := false
 		for _, m := range ms {
-			gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr) || gotUtp
+			gotUtp = s.processReceivedMessage(m.Buffers[0][:m.N], m.Addr()) || gotUtp
 		}
 		if gotUtp && !s.closed {
 			s.afterReceivingUtpMessages()
